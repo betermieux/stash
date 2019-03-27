@@ -6,7 +6,7 @@ replicaCount: 1
 operator:
   registry: appscode
   repository: stash
-  tag: 0.7.0
+  tag: 0.8.3
 pushgateway:
   registry: prom
   repository: pushgateway
@@ -14,7 +14,7 @@ pushgateway:
 cleaner:
   registry: appscode
   repository: kubectl
-  tag: v1.11
+  tag: v1.12
 ## Optionally specify an array of imagePullSecrets.
 ## Secrets must be manually created in the namespace.
 ## ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
@@ -41,6 +41,8 @@ annotations: {}
 ##
 nodeSelector:
   region: informatik
+  beta.kubernetes.io/os: linux
+  beta.kubernetes.io/arch: amd64
 
 ## Tolerations for pod assignment
 ## Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
@@ -82,6 +84,27 @@ apiserver:
   # If true, disables status sub resource for crds.
   # Otherwise, enables status sub resource for Kubernetes version >= 1.11 and disables for other versions.
   disableStatusSubresource: false
+  # If true, bypasses validating webhook xray checks
+  bypassValidatingWebhookXray: false
+  # If true, uses kube-apiserver FQDN for AKS cluster to workaround https://github.com/Azure/AKS/issues/522 (default true)
+  useKubeapiserverFqdnForAks: true
+  # healthcheck configures the readiness and liveliness probes for the operator pod.
+  healthcheck:
+    enabled: true
 
 # Send usage events to Google Analytics
 enableAnalytics: false
+
+monitoring:
+  # specify monitoring agent (either "prometheus.io/builtin" or "prometheus.io/coreos-operator")
+  agent: "none"
+  # specify whether to monitor backup and recovery
+  backup: false
+  # specify whether to monitor stash operator
+  operator: false
+  # specify where ServiceMonitor crd will be created
+  prometheus:
+    namespace: ""
+  serviceMonitor:
+    labels: {}
+

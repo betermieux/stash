@@ -16,6 +16,8 @@ echo ""
 function cleanup() {
   rm -rf $ONESSL ca.crt ca.key server.crt server.key
 }
+
+export APPSCODE_ENV=${APPSCODE_ENV:-prod}
 trap cleanup EXIT
 
 # ref: https://github.com/appscodelabs/libbuild/blob/master/common/lib.sh#L55
@@ -58,26 +60,38 @@ detect_tag() {
   export commit_timestamp
 }
 
-# https://stackoverflow.com/a/677212/244009
-if [ -x "$(command -v onessl)" ]; then
-  export ONESSL=onessl
-else
+onessl_found() {
+  # https://stackoverflow.com/a/677212/244009
+  if [ -x "$(command -v onessl)" ]; then
+    onessl wait-until-has -h >/dev/null 2>&1 || {
+      # old version of onessl found
+      echo "Found outdated onessl"
+      return 1
+    }
+    export ONESSL=onessl
+    return 0
+  fi
+  return 1
+}
+
+onessl_found || {
+  echo "Downloading onessl ..."
   # ref: https://stackoverflow.com/a/27776822/244009
   case "$(uname -s)" in
     Darwin)
-      curl -fsSL -o onessl https://github.com/kubepack/onessl/releases/download/0.3.0/onessl-darwin-amd64
+      curl -fsSL -o onessl https://github.com/kubepack/onessl/releases/download/0.10.0/onessl-darwin-amd64
       chmod +x onessl
       export ONESSL=./onessl
       ;;
 
     Linux)
-      curl -fsSL -o onessl https://github.com/kubepack/onessl/releases/download/0.3.0/onessl-linux-amd64
+      curl -fsSL -o onessl https://github.com/kubepack/onessl/releases/download/0.10.0/onessl-linux-amd64
       chmod +x onessl
       export ONESSL=./onessl
       ;;
 
-    CYGWIN* | MINGW32* | MSYS*)
-      curl -fsSL -o onessl.exe https://github.com/kubepack/onessl/releases/download/0.3.0/onessl-windows-amd64.exe
+    CYGWIN* | MINGW* | MSYS*)
+      curl -fsSL -o onessl.exe https://github.com/kubepack/onessl/releases/download/0.10.0/onessl-windows-amd64.exe
       chmod +x onessl.exe
       export ONESSL=./onessl.exe
       ;;
@@ -85,7 +99,7 @@ else
       echo 'other OS'
       ;;
   esac
-fi
+}
 
 # ref: https://stackoverflow.com/a/7069755/244009
 # ref: https://jonalmeida.com/posts/2013/05/26/different-ways-to-implement-flags-in-bash/
@@ -93,21 +107,24 @@ fi
 
 export STASH_NAMESPACE=kube-system
 export STASH_SERVICE_ACCOUNT=stash-operator
+export STASH_SERVICE_NAME=stash-operator
 export STASH_ENABLE_RBAC=true
 export STASH_RUN_ON_MASTER=0
 export STASH_ENABLE_VALIDATING_WEBHOOK=false
 export STASH_ENABLE_MUTATING_WEBHOOK=false
 export STASH_DOCKER_REGISTRY=appscode
-export STASH_IMAGE_TAG=0.7.0
+export STASH_IMAGE_TAG=0.8.3
 export STASH_IMAGE_PULL_SECRET=
 export STASH_IMAGE_PULL_POLICY=IfNotPresent
 export STASH_ENABLE_STATUS_SUBRESOURCE=false
 export STASH_ENABLE_ANALYTICS=true
 export STASH_UNINSTALL=0
 export STASH_PURGE=0
+export STASH_BYPASS_VALIDATING_WEBHOOK_XRAY=false
+export STASH_USE_KUBEAPISERVER_FQDN_FOR_AKS=true
+export STASH_PRIORITY_CLASS=system-cluster-critical
 
-export APPSCODE_ENV=${APPSCODE_ENV:-prod}
-export SCRIPT_LOCATION="curl -fsSL https://raw.githubusercontent.com/appscode/stash/0.7.0/"
+export SCRIPT_LOCATION="curl -fsSL https://raw.githubusercontent.com/appscode/stash/0.8.3/"
 if [[ "$APPSCODE_ENV" == "dev" ]]; then
   detect_tag
   export SCRIPT_LOCATION="cat "
@@ -122,24 +139,44 @@ $ONESSL semver --check='<1.9.0' $KUBE_APISERVER_VERSION || {
 }
 $ONESSL semver --check='<1.11.0' $KUBE_APISERVER_VERSION || { export STASH_ENABLE_STATUS_SUBRESOURCE=true; }
 
+export STASH_WEBHOOK_SIDE_EFFECTS=
+$ONESSL semver --check='<1.12.0' $KUBE_APISERVER_VERSION || { export STASH_WEBHOOK_SIDE_EFFECTS='sideEffects: None'; }
+
+MONITORING_AGENT_NONE="none"
+MONITORING_AGENT_BUILTIN="prometheus.io/builtin"
+MONITORING_AGENT_COREOS_OPERATOR="prometheus.io/coreos-operator"
+
+export MONITORING_AGENT=${MONITORING_AGENT:-$MONITORING_AGENT_NONE}
+export MONITORING_BACKUP=${MONITORING_BACKUP:-false}
+export MONITORING_OPERATOR=${MONITORING_OPERATOR:-false}
+export SERVICE_MONITOR_LABEL_KEY="app"
+export SERVICE_MONITOR_LABEL_VALUE="stash"
+
 show_help() {
   echo "stash.sh - install stash operator"
   echo " "
   echo "stash.sh [options]"
   echo " "
   echo "options:"
-  echo "-h, --help                         show brief help"
-  echo "-n, --namespace=NAMESPACE          specify namespace (default: kube-system)"
-  echo "    --rbac                         create RBAC roles and bindings (default: true)"
-  echo "    --docker-registry              docker registry used to pull stash images (default: appscode)"
-  echo "    --image-pull-secret            name of secret used to pull stash operator images"
-  echo "    --run-on-master                run stash operator on master"
-  echo "    --enable-validating-webhook    enable/disable validating webhooks for Stash crds"
-  echo "    --enable-mutating-webhook      enable/disable mutating webhooks for Kubernetes workloads"
-  echo "    --enable-status-subresource    If enabled, uses status sub resource for crds"
-  echo "    --enable-analytics             send usage events to Google Analytics (default: true)"
-  echo "    --uninstall                    uninstall stash"
-  echo "    --purge                        purges stash crd objects and crds"
+  echo "-h, --help                             show brief help"
+  echo "-n, --namespace=NAMESPACE              specify namespace (default: kube-system)"
+  echo "    --rbac                             create RBAC roles and bindings (default: true)"
+  echo "    --docker-registry                  docker registry used to pull stash images (default: appscode)"
+  echo "    --image-pull-secret                name of secret used to pull stash operator images"
+  echo "    --run-on-master                    run stash operator on master"
+  echo "    --enable-mutating-webhook          enable/disable mutating webhooks for Kubernetes workloads"
+  echo "    --enable-validating-webhook        enable/disable validating webhooks for Stash crds"
+  echo "    --bypass-validating-webhook-xray   if true, bypasses validating webhook xray checks"
+  echo "    --enable-status-subresource        if enabled, uses status sub resource for crds"
+  echo "    --use-kubeapiserver-fqdn-for-aks   if true, uses kube-apiserver FQDN for AKS cluster to workaround https://github.com/Azure/AKS/issues/522 (default true)"
+  echo "    --enable-analytics                 send usage events to Google Analytics (default: true)"
+  echo "    --uninstall                        uninstall stash"
+  echo "    --purge                            purges stash crd objects and crds"
+  echo "    --monitoring-agent                 specify which monitoring agent to use (default: none)"
+  echo "    --monitoring-backup                specify whether to monitor stash backup and restore activity (default: false)"
+  echo "    --monitoring-operator              specify whether to monitor stash operator (default: false)"
+  echo "    --prometheus-namespace             specify the namespace where Prometheus server is running or will be deployed (default: same namespace as stash-operator)"
+  echo "    --servicemonitor-label             specify the label for ServiceMonitor crd. Prometheus crd will use this label to select the ServiceMonitor. (default: 'app: stash')"
 }
 
 while test $# -gt 0; do
@@ -171,13 +208,6 @@ while test $# -gt 0; do
       export STASH_IMAGE_PULL_SECRET="name: '$secret'"
       shift
       ;;
-    --enable-validating-webhook*)
-      val=$(echo $1 | sed -e 's/^[^=]*=//g')
-      if [ "$val" = "false" ]; then
-        export STASH_ENABLE_VALIDATING_WEBHOOK=false
-      fi
-      shift
-      ;;
     --enable-mutating-webhook*)
       val=$(echo $1 | sed -e 's/^[^=]*=//g')
       if [ "$val" = "false" ]; then
@@ -185,10 +215,35 @@ while test $# -gt 0; do
       fi
       shift
       ;;
+    --enable-validating-webhook*)
+      val=$(echo $1 | sed -e 's/^[^=]*=//g')
+      if [ "$val" = "false" ]; then
+        export STASH_ENABLE_VALIDATING_WEBHOOK=false
+      fi
+      shift
+      ;;
+    --bypass-validating-webhook-xray*)
+      val=$(echo $1 | sed -e 's/^[^=]*=//g')
+      if [ "$val" = "false" ]; then
+        export STASH_BYPASS_VALIDATING_WEBHOOK_XRAY=false
+      else
+        export STASH_BYPASS_VALIDATING_WEBHOOK_XRAY=true
+      fi
+      shift
+      ;;
     --enable-status-subresource*)
       val=$(echo $1 | sed -e 's/^[^=]*=//g')
       if [ "$val" = "false" ]; then
         export STASH_ENABLE_STATUS_SUBRESOURCE=false
+      fi
+      shift
+      ;;
+    --use-kubeapiserver-fqdn-for-aks*)
+      val=$(echo $1 | sed -e 's/^[^=]*=//g')
+      if [ "$val" = "false" ]; then
+        export STASH_USE_KUBEAPISERVER_FQDN_FOR_AKS=false
+      else
+        export STASH_USE_KUBEAPISERVER_FQDN_FOR_AKS=true
       fi
       shift
       ;;
@@ -219,12 +274,61 @@ while test $# -gt 0; do
       export STASH_PURGE=1
       shift
       ;;
+    --monitoring-agent*)
+      val=$(echo $1 | sed -e 's/^[^=]*=//g')
+      if [ "$val" != "$MONITORING_AGENT_BUILTIN" ] && [ "$val" != "$MONITORING_AGENT_COREOS_OPERATOR" ]; then
+        echo 'Invalid monitoring agent. Use "builtin" or "coreos-operator"'
+        exit 1
+      else
+        export MONITORING_AGENT="$val"
+      fi
+      shift
+      ;;
+    --monitoring-backup*)
+      val=$(echo $1 | sed -e 's/^[^=]*=//g')
+      if [ "$val" = "true" ]; then
+        export MONITORING_BACKUP=true
+      fi
+      shift
+      ;;
+    --monitoring-operator*)
+      val=$(echo $1 | sed -e 's/^[^=]*=//g')
+      if [ "$val" = "true" ]; then
+        export MONITORING_OPERATOR="$val"
+      fi
+      shift
+      ;;
+    --prometheus-namespace*)
+      export PROMETHEUS_NAMESPACE=$(echo $1 | sed -e 's/^[^=]*=//g')
+      shift
+      ;;
+    --servicemonitor-label*)
+      label=$(echo $1 | sed -e 's/^[^=]*=//g')
+      # split label into key value pair
+      IFS='='
+      pair=($label)
+      unset IFS
+      # check if the label is valid
+      if [ ! ${#pair[@]} = 2 ]; then
+        echo "Invalid ServiceMonitor label format. Use '--servicemonitor-label=key=value'"
+        exit 1
+      fi
+      export SERVICE_MONITOR_LABEL_KEY="${pair[0]}"
+      export SERVICE_MONITOR_LABEL_VALUE="${pair[1]}"
+      shift
+      ;;
     *)
       show_help
       exit 1
       ;;
   esac
 done
+
+export PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE:-$STASH_NAMESPACE}
+
+if [ "$STASH_NAMESPACE" != "kube-system" ]; then
+    export STASH_PRIORITY_CLASS=""
+fi
 
 if [ "$STASH_UNINSTALL" -eq 1 ]; then
   # delete webhooks and apiservices
@@ -241,6 +345,9 @@ if [ "$STASH_UNINSTALL" -eq 1 ]; then
   kubectl delete clusterrole -l app=stash
   kubectl delete rolebindings -l app=stash --namespace $STASH_NAMESPACE
   kubectl delete role -l app=stash --namespace $STASH_NAMESPACE
+  # delete servicemonitor and stash-apiserver-cert secret. ignore error as they might not exist
+  kubectl delete servicemonitor stash-servicemonitor --namespace $PROMETHEUS_NAMESPACE || true
+  kubectl delete secret stash-apiserver-cert --namespace $PROMETHEUS_NAMESPACE || true
 
   echo "waiting for stash operator pod to stop running"
   for (( ; ; )); do
@@ -361,6 +468,71 @@ for crd in "${crds[@]}"; do
     exit 1
   }
 done
+
+if [ "$STASH_ENABLE_VALIDATING_WEBHOOK" = true ]; then
+  echo "checking whether admission webhook(s) are activated or not"
+  active=$($ONESSL wait-until-has annotation \
+    --apiVersion=apiregistration.k8s.io/v1beta1 \
+    --kind=APIService \
+    --name=v1alpha1.admission.stash.appscode.com \
+    --key=admission-webhook.appscode.com/active \
+    --timeout=5m || {
+    echo
+    echo "Failed to check if admission webhook(s) are activated or not. Please check operator logs to debug further."
+    exit 1
+  })
+  if [ "$active" = false ]; then
+    echo
+    echo "Admission webhooks are not activated."
+    echo "Enable it by configuring --enable-admission-plugins flag of kube-apiserver."
+    echo "For details, visit: https://appsco.de/kube-apiserver-webhooks ."
+    echo "After admission webhooks are activated, please uninstall and then reinstall Stash operator."
+    # uninstall misconfigured webhooks to avoid failures
+    kubectl delete validatingwebhookconfiguration -l app=stash || true
+    exit 1
+  fi
+fi
+
+# configure prometheus monitoring
+if [ "$MONITORING_AGENT" != "$MONITORING_AGENT_NONE" ]; then
+  # if operator monitoring is enabled and prometheus-namespace is provided,
+  # create stash-apiserver-cert there. this will be mounted on prometheus pod.
+  if [ "$MONITORING_OPERATOR" = "true" ] && [ "$PROMETHEUS_NAMESPACE" != "$STASH_NAMESPACE" ]; then
+    ${SCRIPT_LOCATION}hack/deploy/monitor/apiserver-cert.yaml | $ONESSL envsubst | kubectl apply -f -
+  fi
+
+  case "$MONITORING_AGENT" in
+    "$MONITORING_AGENT_BUILTIN")
+      # apply common annotation
+      kubectl annotate service stash-operator -n "$STASH_NAMESPACE" prometheus.io/scrape="true" --overwrite
+
+      # apply pushgateway specific annotation
+      if [ "$MONITORING_BACKUP" = "true" ]; then
+        kubectl annotate service stash-operator -n "$STASH_NAMESPACE" --overwrite \
+          prometheus.io/pushgateway_path="/metrics" \
+          prometheus.io/pushgateway_port="56789" \
+          prometheus.io/pushgateway_scheme="http"
+      fi
+
+      # apply operator specific annotation
+      if [ "$MONITORING_OPERATOR" = "true" ]; then
+        kubectl annotate service stash-operator -n "$STASH_NAMESPACE" --overwrite \
+          prometheus.io/operator_path="/metrics" \
+          prometheus.io/operator_port="8443" \
+          prometheus.io/operator_scheme="https"
+      fi
+      ;;
+    "$MONITORING_AGENT_COREOS_OPERATOR")
+      if [ "$MONITORING_BACKUP" = "true" ] && [ "$MONITORING_OPERATOR" = "true" ]; then
+        ${SCRIPT_LOCATION}hack/deploy/monitor/servicemonitor.yaml | $ONESSL envsubst | kubectl apply -f -
+      elif [ "$MONITORING_BACKUP" = "true" ] && [ "$MONITORING_OPERATOR" = "false" ]; then
+        ${SCRIPT_LOCATION}hack/deploy/monitor/servicemonitor-backup.yaml | $ONESSL envsubst | kubectl apply -f -
+      elif [ "$MONITORING_BACKUP" = "false" ] && [ "$MONITORING_OPERATOR" = "true" ]; then
+        ${SCRIPT_LOCATION}hack/deploy/monitor/servicemonitor-operator.yaml | $ONESSL envsubst | kubectl apply -f -
+      fi
+      ;;
+  esac
+fi
 
 echo
 echo "Successfully installed Stash in $STASH_NAMESPACE namespace!"

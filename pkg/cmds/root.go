@@ -2,26 +2,20 @@ package cmds
 
 import (
 	"flag"
-	"log"
 	"os"
-	"strings"
 
+	"github.com/appscode/go/flags"
 	"github.com/appscode/go/log/golog"
 	v "github.com/appscode/go/version"
-	"github.com/appscode/kutil/tools/analytics"
-	api "github.com/appscode/stash/apis/stash/v1alpha1"
+	"github.com/appscode/stash/apis"
 	"github.com/appscode/stash/client/clientset/versioned/scheme"
 	"github.com/appscode/stash/pkg/util"
-	"github.com/jpillora/go-ogle-analytics"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-)
-
-const (
-	gaTrackingCode = "UA-62096468-20"
+	"kmodules.xyz/client-go/logs"
+	"kmodules.xyz/client-go/tools/cli"
 )
 
 func NewRootCmd() *cobra.Command {
@@ -31,37 +25,34 @@ func NewRootCmd() *cobra.Command {
 		Long:              `Stash is a Kubernetes operator for restic. For more information, visit here: https://appscode.com/products/stash`,
 		DisableAutoGenTag: true,
 		PersistentPreRun: func(c *cobra.Command, args []string) {
-			c.Flags().VisitAll(func(flag *pflag.Flag) {
-				log.Printf("FLAG: --%s=%q", flag.Name, flag.Value)
-			})
-			if util.EnableAnalytics && gaTrackingCode != "" {
-				if client, err := ga.NewClient(gaTrackingCode); err == nil {
-					util.AnalyticsClientID = analytics.ClientID()
-					client.ClientID(util.AnalyticsClientID)
-					parts := strings.Split(c.CommandPath(), " ")
-					client.Send(ga.NewEvent(parts[0], strings.Join(parts[1:], "/")).Label(v.Version.Version))
-				}
-			}
+			flags.DumpAll(c.Flags())
+			cli.SendAnalytics(c, v.Version.Version)
+
 			scheme.AddToScheme(clientsetscheme.Scheme)
 			scheme.AddToScheme(legacyscheme.Scheme)
-			util.LoggerOptions = golog.ParseFlags(c.Flags())
+			cli.LoggerOptions = golog.ParseFlags(c.Flags())
 		},
 	}
 	rootCmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
-	// ref: https://github.com/kubernetes/kubernetes/issues/17162#issuecomment-225596212
-	flag.CommandLine.Parse([]string{})
-	rootCmd.PersistentFlags().BoolVar(&util.EnableAnalytics, "enable-analytics", util.EnableAnalytics, "Send analytical events to Google Analytics")
-	rootCmd.PersistentFlags().BoolVar(&api.EnableStatusSubresource, "enable-status-subresource", api.EnableStatusSubresource, "If true, uses sub resource for crds.")
+	logs.ParseFlags()
+	rootCmd.PersistentFlags().StringVar(&util.ServiceName, "service-name", "stash-operator", "Stash service name.")
+	rootCmd.PersistentFlags().BoolVar(&cli.EnableAnalytics, "enable-analytics", cli.EnableAnalytics, "Send analytical events to Google Analytics")
+	rootCmd.PersistentFlags().BoolVar(&apis.EnableStatusSubresource, "enable-status-subresource", apis.EnableStatusSubresource, "If true, uses sub resource for crds.")
 
 	rootCmd.AddCommand(v.NewCmdVersion())
 	stopCh := genericapiserver.SetupSignalHandler()
 	rootCmd.AddCommand(NewCmdRun(os.Stdout, os.Stderr, stopCh))
 	rootCmd.AddCommand(NewCmdBackup())
+	rootCmd.AddCommand(NewCmdBackupPVC())
+	rootCmd.AddCommand(NewCmdRestorePVC())
+	rootCmd.AddCommand(NewCmdUpdateStatus())
 	rootCmd.AddCommand(NewCmdRecover())
 	rootCmd.AddCommand(NewCmdCheck())
 	rootCmd.AddCommand(NewCmdScaleDown())
 	rootCmd.AddCommand(NewCmdSnapshots())
 	rootCmd.AddCommand(NewCmdForget())
+	rootCmd.AddCommand(NewBackupSession())
+	rootCmd.AddCommand(NewCmdRestore())
 
 	return rootCmd
 }

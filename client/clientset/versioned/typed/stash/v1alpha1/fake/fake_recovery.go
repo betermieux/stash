@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Stash Authors.
+Copyright 2019 The Stash Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -131,7 +131,7 @@ func (c *FakeRecoveries) DeleteCollection(options *v1.DeleteOptions, listOptions
 // Patch applies the patch and returns the patched recovery.
 func (c *FakeRecoveries) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Recovery, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(recoveriesResource, c.ns, name, data, subresources...), &v1alpha1.Recovery{})
+		Invokes(testing.NewPatchSubresourceAction(recoveriesResource, c.ns, name, pt, data, subresources...), &v1alpha1.Recovery{})
 
 	if obj == nil {
 		return nil, err

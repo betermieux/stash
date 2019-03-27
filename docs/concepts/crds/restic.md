@@ -1,13 +1,13 @@
 ---
 title: Restic Overview
 menu:
-  product_stash_0.7.0:
+  product_stash_0.8.3:
     identifier: restic-overview
     name: Restic
     parent: crds
     weight: 10
 product_name: stash
-menu_name: product_stash_0.7.0
+menu_name: product_stash_0.8.3
 section_menu_id: concepts
 ---
 
@@ -86,7 +86,7 @@ You can set one or more of these retention policy options together. To learn mor
 https://restic.readthedocs.io/en/latest/manual.html#removing-snapshots-according-to-a-policy).
 
 ### spec.backend
-To learn how to configure various backends for Restic, please visit [here](/docs/guides/backends.md).
+To learn how to configure various backends for Restic, please visit [here](/docs/guides/backends/overview.md).
 
 ### spec.schedule
 `spec.schedule` is a [cron expression](https://github.com/robfig/cron/blob/v2/doc.go#L26) that indicates how often `restic` commands are invoked for file groups.
@@ -154,8 +154,8 @@ For more details about how to disable and resume Restic see [here](/docs/guides/
 - To restore a backup see [here](/docs/guides/restore.md).
 - Learn about the details of Recovery CRD [here](/docs/concepts/crds/recovery.md).
 - To run backup in offline mode see [here](/docs/guides/offline_backup.md)
-- See the list of supported backends and how to configure them [here](/docs/guides/backends.md).
+- See the list of supported backends and how to configure them [here](/docs/guides/backends/overview.md).
 - See working examples for supported workload types [here](/docs/guides/workloads.md).
-- Thinking about monitoring your backup operations? Stash works [out-of-the-box with Prometheus](/docs/guides/monitoring.md).
+- Thinking about monitoring your backup operations? Stash works [out-of-the-box with Prometheus](/docs/guides/monitoring/overview.md).
 - Learn about how to configure [RBAC roles](/docs/guides/rbac.md).
 - Want to hack on Stash? Check our [contribution guidelines](/docs/CONTRIBUTING.md).

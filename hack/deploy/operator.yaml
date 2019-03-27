@@ -32,10 +32,24 @@ spec:
         - --audit-log-path=-
         - --tls-cert-file=/var/serving-cert/tls.crt
         - --tls-private-key-file=/var/serving-cert/tls.key
+        - --service-name=${STASH_SERVICE_NAME}
+        - --enable-mutating-webhook=${STASH_ENABLE_MUTATING_WEBHOOK}
+        - --enable-validating-webhook=${STASH_ENABLE_VALIDATING_WEBHOOK}
+        - --bypass-validating-webhook-xray=${STASH_BYPASS_VALIDATING_WEBHOOK_XRAY}
         - --enable-status-subresource=${STASH_ENABLE_STATUS_SUBRESOURCE}
+        - --use-kubeapiserver-fqdn-for-aks=${STASH_USE_KUBEAPISERVER_FQDN_FOR_AKS}
         - --enable-analytics=${STASH_ENABLE_ANALYTICS}
         ports:
         - containerPort: 8443
+        env:
+        - name: MY_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: MY_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         resources:
           requests:
             cpu: "100m"
@@ -47,6 +61,13 @@ spec:
             path: /healthz
             port: 8443
             scheme: HTTPS
+          initialDelaySeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8443
+            scheme: HTTPS
+          initialDelaySeconds: 5
       - name: pushgateway
         args:
         - --web.listen-address=:56789
@@ -73,7 +94,7 @@ spec:
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
-      priorityClassName: system-cluster-critical
+      priorityClassName: ${STASH_PRIORITY_CLASS}
 ---
 # kube lacks the service serving cert signer, so provide a manual secret for it
 apiVersion: v1
@@ -92,13 +113,13 @@ data:
 apiVersion: v1
 kind: Service
 metadata:
-  name: stash-operator
+  name: ${STASH_SERVICE_NAME}
   namespace: ${STASH_NAMESPACE}
   labels:
     app: stash
 spec:
   ports:
-  - name: admission
+  - name: api
     port: 443
     targetPort: 8443
   - name: pushgateway

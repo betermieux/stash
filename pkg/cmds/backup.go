@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/appscode/go/log"
-	"github.com/appscode/kutil/meta"
-	api "github.com/appscode/stash/apis/stash/v1alpha1"
+	v "github.com/appscode/go/version"
+	"github.com/appscode/stash/apis"
 	cs "github.com/appscode/stash/client/clientset/versioned"
 	"github.com/appscode/stash/pkg/backup"
 	"github.com/appscode/stash/pkg/docker"
@@ -16,6 +16,8 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"kmodules.xyz/client-go/meta"
+	"kmodules.xyz/client-go/tools/cli"
 )
 
 func NewCmdBackup() *cobra.Command {
@@ -39,6 +41,9 @@ func NewCmdBackup() *cobra.Command {
 		Use:               "backup",
 		Short:             "Run Stash Backup",
 		DisableAutoGenTag: true,
+		PreRun: func(c *cobra.Command, args []string) {
+			cli.SendAnalytics(c, v.Version.Version)
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			config, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfigPath)
 			if err != nil {
@@ -75,7 +80,7 @@ func NewCmdBackup() *cobra.Command {
 					log.Fatal(err)
 				}
 			} else { // for offline backup
-				if opt.Workload.Kind == api.KindDaemonSet || opt.Workload.Kind == api.KindStatefulSet {
+				if opt.Workload.Kind == apis.KindDaemonSet || opt.Workload.Kind == apis.KindStatefulSet {
 					log.Infoln("Running backup once")
 					if err = ctrl.Backup(); err != nil {
 						log.Fatal(err)

@@ -4,10 +4,7 @@ kind: ClusterRole
 metadata:
   name: {{ template "stash.fullname" . }}
   labels:
-    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
-    app: "{{ template "stash.name" . }}"
-    heritage: "{{ .Release.Service }}"
-    release: "{{ .Release.Name }}"
+    {{- include "stash.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - apiextensions.k8s.io
@@ -15,11 +12,16 @@ rules:
   - customresourcedefinitions
   verbs: ["*"]
 - apiGroups:
+  - apiregistration.k8s.io
+  resources:
+  - apiservices
+  verbs: ["get", "patch"]
+- apiGroups:
   - admissionregistration.k8s.io
   resources:
   - mutatingwebhookconfigurations
   - validatingwebhookconfigurations
-  verbs: ["delete", "list", "watch", "patch"]
+  verbs: ["delete", "get", "list", "watch", "patch"]
 - apiGroups:
   - stash.appscode.com
   resources:
@@ -54,6 +56,7 @@ rules:
   - ""
   resources:
   - secrets
+  - services
   verbs: ["get"]
 - apiGroups:
   - ""

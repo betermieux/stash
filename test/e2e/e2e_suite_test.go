@@ -6,15 +6,11 @@ import (
 	"time"
 
 	logs "github.com/appscode/go/log/golog"
-	crdutils "github.com/appscode/kutil/apiextensions/v1beta1"
-	discovery_util "github.com/appscode/kutil/discovery"
-	"github.com/appscode/kutil/meta"
-	"github.com/appscode/kutil/tools/clientcmd"
+	"github.com/appscode/stash/apis"
 	api "github.com/appscode/stash/apis/stash/v1alpha1"
 	"github.com/appscode/stash/client/clientset/versioned/scheme"
 	_ "github.com/appscode/stash/client/clientset/versioned/scheme"
 	"github.com/appscode/stash/pkg/controller"
-	"github.com/appscode/stash/pkg/util"
 	"github.com/appscode/stash/test/e2e/framework"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
@@ -24,6 +20,11 @@ import (
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	ka "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	crdutils "kmodules.xyz/client-go/apiextensions/v1beta1"
+	discovery_util "kmodules.xyz/client-go/discovery"
+	"kmodules.xyz/client-go/meta"
+	"kmodules.xyz/client-go/tools/cli"
+	"kmodules.xyz/client-go/tools/clientcmd"
 )
 
 const (
@@ -47,7 +48,7 @@ func TestE2e(t *testing.T) {
 var _ = BeforeSuite(func() {
 	scheme.AddToScheme(clientsetscheme.Scheme)
 	scheme.AddToScheme(legacyscheme.Scheme)
-	util.LoggerOptions.Verbosity = "5"
+	cli.LoggerOptions.Verbosity = "5"
 
 	clientConfig, err := clientcmd.BuildConfigFromContext(options.KubeConfig, options.KubeContext)
 	Expect(err).NotTo(HaveOccurred())
@@ -57,7 +58,7 @@ var _ = BeforeSuite(func() {
 	serverVersion, err := discovery_util.GetBaseVersion(discClient)
 	Expect(err).NotTo(HaveOccurred())
 	if strings.Compare(serverVersion, "1.11") >= 0 {
-		api.EnableStatusSubresource = true
+		apis.EnableStatusSubresource = true
 	}
 
 	err = options.ApplyTo(ctrlConfig)
@@ -82,6 +83,7 @@ var _ = BeforeSuite(func() {
 
 	if !options.SelfHostedOperator {
 		go root.StartAPIServerAndOperator(options.KubeConfig, options.ExtraOptions)
+		By("Waiting for API Server to be ready")
 		root.EventuallyAPIServerReady().Should(Succeed())
 		// let's API server be warmed up
 		time.Sleep(time.Second * 5)
@@ -97,9 +99,11 @@ var _ = AfterSuite(func() {
 	}
 
 	if !options.SelfHostedOperator {
-		root.KubeClient.CoreV1().Endpoints(root.Namespace()).Delete("stash-local-apiserver", meta.DeleteInBackground())
-		root.KubeClient.CoreV1().Services(root.Namespace()).Delete("stash-local-apiserver", meta.DeleteInBackground())
+		root.KubeClient.CoreV1().Endpoints(root.Namespace()).Delete("stash-dev", meta.DeleteInBackground())
+		root.KubeClient.CoreV1().Services(root.Namespace()).Delete("stash-dev", meta.DeleteInBackground())
 		root.KAClient.ApiregistrationV1beta1().APIServices().Delete("v1alpha1.admission.stash.appscode.com", meta.DeleteInBackground())
+		root.KAClient.ApiregistrationV1beta1().APIServices().Delete("v1alpha1.repositories.stash.appscode.com", meta.DeleteInBackground())
 	}
+	root.KubeClient.RbacV1().ClusterRoleBindings().Delete("serviceaccounts-cluster-admin", meta.DeleteInBackground())
 	root.DeleteNamespace(root.Namespace())
 })

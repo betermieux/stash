@@ -11,7 +11,7 @@
       "name": "Apache 2.0",
       "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
     },
-    "version": "v0.7.0"
+    "version": "v0.8.3"
   },
   "paths": {
     "/apis/": {
@@ -267,7 +267,6 @@
           {
             "name": "body",
             "in": "body",
-            "required": true,
             "schema": {
               "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
             }
@@ -546,13 +545,6 @@
           },
           {
             "uniqueItems": true,
-            "type": "boolean",
-            "description": "If true, partially initialized resources are included in the response.",
-            "name": "includeUninitialized",
-            "in": "query"
-          },
-          {
-            "uniqueItems": true,
             "type": "string",
             "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
             "name": "labelSelector",
@@ -627,6 +619,13 @@
             "schema": {
               "$ref": "#/definitions/com.github.appscode.stash.apis.stash.v1alpha1.Recovery"
             }
+          },
+          {
+            "uniqueItems": true,
+            "type": "string",
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "name": "dryRun",
+            "in": "query"
           }
         ],
         "responses": {
@@ -690,13 +689,6 @@
           },
           {
             "uniqueItems": true,
-            "type": "boolean",
-            "description": "If true, partially initialized resources are included in the response.",
-            "name": "includeUninitialized",
-            "in": "query"
-          },
-          {
-            "uniqueItems": true,
             "type": "string",
             "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
             "name": "labelSelector",
@@ -747,6 +739,13 @@
         }
       },
       "parameters": [
+        {
+          "uniqueItems": true,
+          "type": "boolean",
+          "description": "If true, partially initialized resources are included in the response.",
+          "name": "includeUninitialized",
+          "in": "query"
+        },
         {
           "uniqueItems": true,
           "type": "string",
@@ -822,6 +821,13 @@
             "schema": {
               "$ref": "#/definitions/com.github.appscode.stash.apis.stash.v1alpha1.Recovery"
             }
+          },
+          {
+            "uniqueItems": true,
+            "type": "string",
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "name": "dryRun",
+            "in": "query"
           }
         ],
         "responses": {
@@ -866,7 +872,6 @@
           {
             "name": "body",
             "in": "body",
-            "required": true,
             "schema": {
               "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
             }
@@ -948,6 +953,13 @@
             "schema": {
               "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
             }
+          },
+          {
+            "uniqueItems": true,
+            "type": "string",
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "name": "dryRun",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1028,13 +1040,6 @@
           },
           {
             "uniqueItems": true,
-            "type": "boolean",
-            "description": "If true, partially initialized resources are included in the response.",
-            "name": "includeUninitialized",
-            "in": "query"
-          },
-          {
-            "uniqueItems": true,
             "type": "string",
             "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
             "name": "labelSelector",
@@ -1109,6 +1114,13 @@
             "schema": {
               "$ref": "#/definitions/com.github.appscode.stash.apis.stash.v1alpha1.Repository"
             }
+          },
+          {
+            "uniqueItems": true,
+            "type": "string",
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "name": "dryRun",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1172,13 +1184,6 @@
           },
           {
             "uniqueItems": true,
-            "type": "boolean",
-            "description": "If true, partially initialized resources are included in the response.",
-            "name": "includeUninitialized",
-            "in": "query"
-          },
-          {
-            "uniqueItems": true,
             "type": "string",
             "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
             "name": "labelSelector",
@@ -1229,6 +1234,13 @@
         }
       },
       "parameters": [
+        {
+          "uniqueItems": true,
+          "type": "boolean",
+          "description": "If true, partially initialized resources are included in the response.",
+          "name": "includeUninitialized",
+          "in": "query"
+        },
         {
           "uniqueItems": true,
           "type": "string",
@@ -1304,6 +1316,13 @@
             "schema": {
               "$ref": "#/definitions/com.github.appscode.stash.apis.stash.v1alpha1.Repository"
             }
+          },
+          {
+            "uniqueItems": true,
+            "type": "string",
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "name": "dryRun",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1348,7 +1367,6 @@
           {
             "name": "body",
             "in": "body",
-            "required": true,
             "schema": {
               "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
             }
@@ -1430,6 +1448,13 @@
             "schema": {
               "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
             }
+          },
+          {
+            "uniqueItems": true,
+            "type": "string",
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "name": "dryRun",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1510,13 +1535,6 @@
           },
           {
             "uniqueItems": true,
-            "type": "boolean",
-            "description": "If true, partially initialized resources are included in the response.",
-            "name": "includeUninitialized",
-            "in": "query"
-          },
-          {
-            "uniqueItems": true,
             "type": "string",
             "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
             "name": "labelSelector",
@@ -1591,6 +1609,13 @@
             "schema": {
               "$ref": "#/definitions/com.github.appscode.stash.apis.stash.v1alpha1.Restic"
             }
+          },
+          {
+            "uniqueItems": true,
+            "type": "string",
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "name": "dryRun",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1654,13 +1679,6 @@
           },
           {
             "uniqueItems": true,
-            "type": "boolean",
-            "description": "If true, partially initialized resources are included in the response.",
-            "name": "includeUninitialized",
-            "in": "query"
-          },
-          {
-            "uniqueItems": true,
             "type": "string",
             "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
             "name": "labelSelector",
@@ -1711,6 +1729,13 @@
         }
       },
       "parameters": [
+        {
+          "uniqueItems": true,
+          "type": "boolean",
+          "description": "If true, partially initialized resources are included in the response.",
+          "name": "includeUninitialized",
+          "in": "query"
+        },
         {
           "uniqueItems": true,
           "type": "string",
@@ -1786,6 +1811,13 @@
             "schema": {
               "$ref": "#/definitions/com.github.appscode.stash.apis.stash.v1alpha1.Restic"
             }
+          },
+          {
+            "uniqueItems": true,
+            "type": "string",
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "name": "dryRun",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1830,7 +1862,6 @@
           {
             "name": "body",
             "in": "body",
-            "required": true,
             "schema": {
               "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
             }
@@ -1912,6 +1943,13 @@
             "schema": {
               "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
             }
+          },
+          {
+            "uniqueItems": true,
+            "type": "string",
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "name": "dryRun",
+            "in": "query"
           }
         ],
         "responses": {
@@ -3526,6 +3564,7 @@
     "com.github.appscode.stash.apis.stash.v1alpha1.RepositorySpec": {
       "properties": {
         "backend": {
+          "description": "Backend specify the storage where backed up snapshot will be stored",
           "$ref": "#/definitions/xyz.kmodules.objectstore-api.api.v1.Backend"
         },
         "wipeOut": {
@@ -3537,24 +3576,47 @@
     "com.github.appscode.stash.apis.stash.v1alpha1.RepositoryStatus": {
       "properties": {
         "backupCount": {
+          "description": "Deprecated",
           "type": "integer",
           "format": "int64"
         },
         "firstBackupTime": {
+          "description": "FirstBackupTime indicates the timestamp when the first backup was taken",
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
         },
+        "integrity": {
+          "description": "Integrity shows result of repository integrity check after last backup",
+          "type": "boolean"
+        },
         "lastBackupDuration": {
+          "description": "Deprecated",
           "type": "string"
         },
         "lastBackupTime": {
+          "description": "LastBackupTime indicates the timestamp when the latest backup was taken",
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
         },
         "lastSuccessfulBackupTime": {
+          "description": "Deprecated",
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
         },
         "observedGeneration": {
           "description": "observedGeneration is the most recent generation observed for this resource. It corresponds to the resource's generation, which is updated on mutation by the API Server.",
           "$ref": "#/definitions/com.github.appscode.go.encoding.json.types.IntHash"
+        },
+        "size": {
+          "description": "Size show size of repository after last backup",
+          "type": "string"
+        },
+        "snapshotCount": {
+          "description": "SnapshotCount shows number of snapshots stored in the repository",
+          "type": "integer",
+          "format": "int32"
+        },
+        "snapshotRemovedOnLastCleanup": {
+          "description": "SnapshotRemovedOnLastCleanup shows number of old snapshots cleaned up according to retention policy on last backup session",
+          "type": "integer",
+          "format": "int32"
         }
       }
     },
@@ -4907,6 +4969,11 @@
           "group": "stash.appscode.com",
           "version": "v1alpha1",
           "kind": "DeleteOptions"
+        },
+        {
+          "group": "stash.appscode.com",
+          "version": "v1beta1",
+          "kind": "DeleteOptions"
         }
       ]
     },
@@ -5109,7 +5176,7 @@
       }
     },
     "io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference": {
-      "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+      "description": "OwnerReference contains enough information to let you identify an owning object. An owning object must be in the same namespace as the dependent, or be cluster-scoped, so there is no namespace field.",
       "required": [
         "apiVersion",
         "kind",
@@ -5219,6 +5286,11 @@
           "group": "stash.appscode.com",
           "version": "v1alpha1",
           "kind": "Status"
+        },
+        {
+          "group": "stash.appscode.com",
+          "version": "v1beta1",
+          "kind": "Status"
         }
       ]
     },
@@ -5307,21 +5379,17 @@
           "group": "stash.appscode.com",
           "version": "v1alpha1",
           "kind": "WatchEvent"
+        },
+        {
+          "group": "stash.appscode.com",
+          "version": "v1beta1",
+          "kind": "WatchEvent"
         }
       ]
     },
     "io.k8s.apimachinery.pkg.runtime.RawExtension": {
       "description": "RawExtension is used to hold extensions in external versions.\n\nTo use this, make a field which has RawExtension as its type in your external, versioned struct, and Object in your internal struct. You also need to register your various plugin types.\n\n// Internal package: type MyAPIObject struct {\n\truntime.TypeMeta `json:\",inline\"`\n\tMyPlugin runtime.Object `json:\"myPlugin\"`\n} type PluginA struct {\n\tAOption string `json:\"aOption\"`\n}\n\n// External package: type MyAPIObject struct {\n\truntime.TypeMeta `json:\",inline\"`\n\tMyPlugin runtime.RawExtension `json:\"myPlugin\"`\n} type PluginA struct {\n\tAOption string `json:\"aOption\"`\n}\n\n// On the wire, the JSON will look something like this: {\n\t\"kind\":\"MyAPIObject\",\n\t\"apiVersion\":\"v1\",\n\t\"myPlugin\": {\n\t\t\"kind\":\"PluginA\",\n\t\t\"aOption\":\"foo\",\n\t},\n}\n\nSo what happens? Decode first uses json or yaml to unmarshal the serialized data into your external MyAPIObject. That causes the raw JSON to be stored, but not unpacked. The next step is to copy (using pkg/conversion) into the internal struct. The runtime package's DefaultScheme has conversion functions installed which will unpack the JSON stored in RawExtension, turning it into the correct object type, and storing it in the Object. (TODO: In the case where the object is of an unknown type, a runtime.Unknown object will be created and stored.)",
-      "required": [
-        "Raw"
-      ],
-      "properties": {
-        "Raw": {
-          "description": "Raw is the underlying serialization of this object.",
-          "type": "string",
-          "format": "byte"
-        }
-      }
+      "type": "object"
     },
     "xyz.kmodules.objectstore-api.api.v1.AzureSpec": {
       "properties": {

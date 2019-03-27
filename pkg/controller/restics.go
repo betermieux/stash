@@ -4,13 +4,6 @@ import (
 	"fmt"
 
 	"github.com/appscode/go/log"
-	"github.com/appscode/kubernetes-webhook-util/admission"
-	hooks "github.com/appscode/kubernetes-webhook-util/admission/v1beta1"
-	webhook "github.com/appscode/kubernetes-webhook-util/admission/v1beta1/generic"
-	apps_util "github.com/appscode/kutil/apps/v1"
-	batch_util "github.com/appscode/kutil/batch/v1beta1"
-	core_util "github.com/appscode/kutil/core/v1"
-	"github.com/appscode/kutil/tools/queue"
 	"github.com/appscode/stash/apis/stash"
 	api "github.com/appscode/stash/apis/stash/v1alpha1"
 	"github.com/appscode/stash/pkg/docker"
@@ -26,7 +19,16 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/reference"
+	apps_util "kmodules.xyz/client-go/apps/v1"
+	batch_util "kmodules.xyz/client-go/batch/v1beta1"
+	core_util "kmodules.xyz/client-go/core/v1"
+	"kmodules.xyz/client-go/tools/queue"
+	"kmodules.xyz/webhook-runtime/admission"
+	hooks "kmodules.xyz/webhook-runtime/admission/v1beta1"
+	webhook "kmodules.xyz/webhook-runtime/admission/v1beta1/generic"
 )
+
+// TODO: Add validator that will reject to create Restic if any BackupConfiguration exist for target workload
 
 func (c *StashController) NewResticWebhook() hooks.AdmissionHook {
 	return webhook.NewGenericWebhook(
@@ -252,16 +254,16 @@ func (c *StashController) EnsureSidecar(restic *api.Restic) {
 			}
 		}
 	}
-	//{
-	//	if resources, err := c.ssLister.StatefulSets(restic.Namespace).List(sel); err == nil {
-	//		for _, resource := range resources {
-	//			key, err := cache.MetaNamespaceKeyFunc(resource)
-	//			if err == nil {
-	//				c.ssQueue.GetQueue().Add(key)
-	//			}
-	//		}
-	//	}
-	//}
+	{
+		if resources, err := c.ssLister.StatefulSets(restic.Namespace).List(sel); err == nil {
+			for _, resource := range resources {
+				key, err := cache.MetaNamespaceKeyFunc(resource)
+				if err == nil {
+					c.ssQueue.GetQueue().Add(key)
+				}
+			}
+		}
+	}
 	{
 		if resources, err := c.rcLister.ReplicationControllers(restic.Namespace).List(sel); err == nil {
 			for _, resource := range resources {
@@ -332,25 +334,27 @@ func (c *StashController) EnsureSidecarDeleted(namespace, name string) {
 			}
 		}
 	}
-	//if resources, err := c.ssLister.StatefulSets(namespace).List(labels.Everything()); err == nil {
-	//	for _, resource := range resources {
-	//		restic, err := util.GetAppliedRestic(resource.Annotations)
-	//		if err != nil {
-	//			c.recorder.Eventf(
-	//				kutil.GetObjectReference(resource, apps.SchemeGroupVersion),
-	//				core.EventTypeWarning,
-	//				eventer.EventReasonInvalidRestic,
-	//				"Reason: %s",
-	//				err.Error(),
-	//			)
-	//		} else if restic != nil && restic.Namespace == namespace && restic.Name == name {
-	//			key, err := cache.MetaNamespaceKeyFunc(resource)
-	//			if err == nil {
-	//				c.ssQueue.GetQueue().Add(key)
-	//			}
-	//		}
-	//	}
-	//}
+	if resources, err := c.ssLister.StatefulSets(namespace).List(labels.Everything()); err == nil {
+		for _, resource := range resources {
+			restic, err := util.GetAppliedRestic(resource.Annotations)
+			if err != nil {
+				if ref, e2 := reference.GetReference(scheme.Scheme, resource); e2 != nil {
+					c.recorder.Eventf(
+						ref,
+						core.EventTypeWarning,
+						eventer.EventReasonInvalidRestic,
+						"Reason: %s",
+						err.Error(),
+					)
+				}
+			} else if restic != nil && restic.Namespace == namespace && restic.Name == name {
+				key, err := cache.MetaNamespaceKeyFunc(resource)
+				if err == nil {
+					c.ssQueue.GetQueue().Add(key)
+				}
+			}
+		}
+	}
 	if resources, err := c.rcLister.ReplicationControllers(namespace).List(labels.Everything()); err == nil {
 		for _, resource := range resources {
 			restic, err := util.GetAppliedRestic(resource.Annotations)

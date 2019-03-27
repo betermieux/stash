@@ -1,11 +1,6 @@
 package controller
 
 import (
-	"github.com/appscode/kubernetes-webhook-util/admission"
-	hooks "github.com/appscode/kubernetes-webhook-util/admission/v1beta1"
-	webhook "github.com/appscode/kubernetes-webhook-util/admission/v1beta1/generic"
-	core_util "github.com/appscode/kutil/core/v1"
-	"github.com/appscode/kutil/tools/queue"
 	"github.com/appscode/stash/apis/stash"
 	api "github.com/appscode/stash/apis/stash/v1alpha1"
 	stash_util "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1alpha1/util"
@@ -14,7 +9,12 @@ import (
 	"github.com/graymeta/stow"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	core_util "kmodules.xyz/client-go/core/v1"
+	"kmodules.xyz/client-go/tools/queue"
 	"kmodules.xyz/objectstore-api/osm"
+	"kmodules.xyz/webhook-runtime/admission"
+	hooks "kmodules.xyz/webhook-runtime/admission/v1beta1"
+	webhook "kmodules.xyz/webhook-runtime/admission/v1beta1/generic"
 )
 
 func (c *StashController) NewRepositoryWebhook() hooks.AdmissionHook {
@@ -40,12 +40,12 @@ func (c *StashController) NewRepositoryWebhook() hooks.AdmissionHook {
 }
 func (c *StashController) initRepositoryWatcher() {
 	c.repoInformer = c.stashInformerFactory.Stash().V1alpha1().Repositories().Informer()
-	c.repoQueue = queue.New("Repository", c.MaxNumRequeues, c.NumThreads, c.runRepositoryInjector)
+	c.repoQueue = queue.New("Repository", c.MaxNumRequeues, c.NumThreads, c.runRepositoryReconciler)
 	c.repoInformer.AddEventHandler(queue.DefaultEventHandler(c.repoQueue.GetQueue()))
 	c.repoLister = c.stashInformerFactory.Stash().V1alpha1().Repositories().Lister()
 }
 
-func (c *StashController) runRepositoryInjector(key string) error {
+func (c *StashController) runRepositoryReconciler(key string) error {
 	obj, exist, err := c.repoInformer.GetIndexer().GetByKey(key)
 	if err != nil {
 		glog.Errorf("Fetching object with key %s from store failed with %v", key, err)
@@ -61,7 +61,8 @@ func (c *StashController) runRepositoryInjector(key string) error {
 
 		if repo.DeletionTimestamp != nil {
 			if core_util.HasFinalizer(repo.ObjectMeta, util.RepositoryFinalizer) {
-				if repo.Spec.WipeOut {
+				// ignore invalid repository objects (eg: created by xray).
+				if repo.IsValid() == nil && repo.Spec.WipeOut {
 					err = c.deleteResticRepository(repo)
 					if err != nil {
 						return err

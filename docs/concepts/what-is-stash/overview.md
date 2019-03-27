@@ -2,13 +2,13 @@
 title: Stash Overview
 description: Stash Overview
 menu:
-  product_stash_0.7.0:
+  product_stash_0.8.3:
     identifier: overview-concepts
     name: Overview
     parent: what-is-stash
     weight: 10
 product_name: stash
-menu_name: product_stash_0.7.0
+menu_name: product_stash_0.8.3
 section_menu_id: concepts
 ---
 # Stash
@@ -22,7 +22,7 @@ section_menu_id: concepts
 - StatefulSet
 
 ## Features
- - Fast, secure, efficient backup of any kubernetes [volumes](https://kubernetes.io/docs/concepts/storage/volumes/).
+ - Fast, secure, efficient backup of any Kubernetes [volumes](https://kubernetes.io/docs/concepts/storage/volumes/).
  - Automates configuration of `restic` for periodic backup.
  - Store backed up files in various cloud storage provider, including S3, GCS, Azure, OpenStack Swift, DigitalOcean Spaces etc.
  - Restore backup easily.

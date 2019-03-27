@@ -1,13 +1,13 @@
 ---
 title: Repository Overview
 menu:
-  product_stash_0.7.0:
+  product_stash_0.8.3:
     identifier: repository-overview
     name: Repository
     parent: crds
     weight: 15
 product_name: stash
-menu_name: product_stash_0.7.0
+menu_name: product_stash_0.8.3
 section_menu_id: concepts
 ---
 
@@ -72,7 +72,7 @@ A `Repository` object maintains some important information using labels. These l
 
 ### spec.backend
 
-`spec.backend` holds the backend information where the backup snapshots are being stored. To learn how to configure various backends for Restic, please visit [here](/docs/guides/backends.md).
+`spec.backend` holds the backend information where the backup snapshots are being stored. To learn how to configure various backends for Restic, please visit [here](/docs/guides/backends/overview.md).
 
 ### backend prefix/subPath
 
@@ -123,7 +123,7 @@ $ kubectl get repository -l node-name=minikube
 
 ## Deleting Repository
 
-Stash allows the users to delete **only `Repository` crd** or **`Repository` crd with respective restic repository**. Here, we will show how to perform these delete operations.
+Stash allows the users to delete **only `Repository` crd** or **`Repository` crd with respective restic repository**. Here, we are going to show how to perform these delete operations.
 
 ### Delete only Repository crd
 
@@ -213,8 +213,8 @@ If everything goes well, respective restic repository will be deleted from the b
 - Learn about the details of Snapshot [here](/docs/concepts/crds/snapshot.md).
 - Learn about the details of Recovery CRD [here](/docs/concepts/crds/recovery.md).
 - To run backup in offline mode see [here](/docs/guides/offline_backup.md)
-- See the list of supported backends and how to configure them [here](/docs/guides/backends.md).
+- See the list of supported backends and how to configure them [here](/docs/guides/backends/overview.md).
 - See working examples for supported workload types [here](/docs/guides/workloads.md).
-- Thinking about monitoring your backup operations? Stash works [out-of-the-box with Prometheus](/docs/guides/monitoring.md).
+- Thinking about monitoring your backup operations? Stash works [out-of-the-box with Prometheus](/docs/guides/monitoring/overview.md).
 - Learn about how to configure [RBAC roles](/docs/guides/rbac.md).
 - Want to hack on Stash? Check our [contribution guidelines](/docs/CONTRIBUTING.md).

@@ -3,7 +3,6 @@ package controller
 import (
 	"time"
 
-	"github.com/appscode/kutil/discovery"
 	cs "github.com/appscode/stash/client/clientset/versioned"
 	stashinformers "github.com/appscode/stash/client/informers/externalversions"
 	"github.com/appscode/stash/pkg/eventer"
@@ -13,6 +12,10 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	reg_util "kmodules.xyz/client-go/admissionregistration/v1beta1"
+	"kmodules.xyz/client-go/discovery"
+	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
+	appcatalog_informers "kmodules.xyz/custom-resources/client/informers/externalversions"
 )
 
 const (
@@ -21,21 +24,24 @@ const (
 )
 
 type config struct {
-	EnableRBAC     bool
-	StashImageTag  string
-	DockerRegistry string
-	MaxNumRequeues int
-	NumThreads     int
-	ResyncPeriod   time.Duration
+	EnableRBAC              bool
+	StashImageTag           string
+	DockerRegistry          string
+	MaxNumRequeues          int
+	NumThreads              int
+	ResyncPeriod            time.Duration
+	EnableValidatingWebhook bool
+	EnableMutatingWebhook   bool
 }
 
 type Config struct {
 	config
 
-	ClientConfig *rest.Config
-	KubeClient   kubernetes.Interface
-	StashClient  cs.Interface
-	CRDClient    crd_cs.ApiextensionsV1beta1Interface
+	ClientConfig     *rest.Config
+	KubeClient       kubernetes.Interface
+	StashClient      cs.Interface
+	CRDClient        crd_cs.ApiextensionsV1beta1Interface
+	AppCatalogClient appcatalog_cs.Interface
 }
 
 func NewConfig(clientConfig *rest.Config) *Config {
@@ -53,22 +59,36 @@ func (c *Config) New() (*StashController, error) {
 		opt.IncludeUninitialized = true
 	}
 	ctrl := &StashController{
-		config:               c.config,
-		clientConfig:         c.ClientConfig,
-		kubeClient:           c.KubeClient,
-		stashClient:          c.StashClient,
-		crdClient:            c.CRDClient,
-		kubeInformerFactory:  informers.NewFilteredSharedInformerFactory(c.KubeClient, c.ResyncPeriod, core.NamespaceAll, tweakListOptions),
-		stashInformerFactory: stashinformers.NewSharedInformerFactory(c.StashClient, c.ResyncPeriod),
-		recorder:             eventer.NewEventRecorder(c.KubeClient, "stash-controller"),
+		config:           c.config,
+		clientConfig:     c.ClientConfig,
+		kubeClient:       c.KubeClient,
+		stashClient:      c.StashClient,
+		crdClient:        c.CRDClient,
+		appCatalogClient: c.AppCatalogClient,
+		kubeInformerFactory: informers.NewSharedInformerFactoryWithOptions(
+			c.KubeClient,
+			c.ResyncPeriod,
+			informers.WithNamespace(core.NamespaceAll),
+			informers.WithTweakListOptions(tweakListOptions)),
+		stashInformerFactory:      stashinformers.NewSharedInformerFactory(c.StashClient, c.ResyncPeriod),
+		appCatalogInformerFactory: appcatalog_informers.NewSharedInformerFactory(c.AppCatalogClient, c.ResyncPeriod),
+		recorder:                  eventer.NewEventRecorder(c.KubeClient, "stash-operator"),
 	}
 
 	if err := ctrl.ensureCustomResourceDefinitions(); err != nil {
 		return nil, err
 	}
-	if err := ctrl.UpdateWebhookCABundle(); err != nil {
-		return nil, err
+	if c.EnableMutatingWebhook {
+		if err := reg_util.UpdateMutatingWebhookCABundle(c.ClientConfig, mutatingWebhook); err != nil {
+			return nil, err
+		}
 	}
+	if c.EnableValidatingWebhook {
+		if err := reg_util.UpdateValidatingWebhookCABundle(c.ClientConfig, validatingWebhook); err != nil {
+			return nil, err
+		}
+	}
+
 	if ctrl.EnableRBAC {
 		if err := ctrl.ensureSidecarClusterRole(); err != nil {
 			return nil, err
@@ -76,15 +96,23 @@ func (c *Config) New() (*StashController, error) {
 	}
 
 	ctrl.initNamespaceWatcher()
-	ctrl.initResticWatcher()
-	ctrl.initRecoveryWatcher()
-	ctrl.initRepositoryWatcher()
 	ctrl.initDeploymentWatcher()
 	ctrl.initDaemonSetWatcher()
 	ctrl.initStatefulSetWatcher()
 	ctrl.initRCWatcher()
 	ctrl.initReplicaSetWatcher()
 	ctrl.initJobWatcher()
+	ctrl.initPVCWatcher()
+
+	ctrl.initResticWatcher()
+	ctrl.initRecoveryWatcher()
+	ctrl.initRepositoryWatcher()
+
+	ctrl.initBackupConfigurationWatcher()
+	ctrl.initBackupSessionWatcher()
+	ctrl.initRestoreSessionWatcher()
+
+	ctrl.initAppBindingWatcher()
 
 	return ctrl, nil
 }

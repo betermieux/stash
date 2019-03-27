@@ -11,15 +11,25 @@ rules:
   - customresourcedefinitions
   verbs: ["*"]
 - apiGroups:
+  - apiregistration.k8s.io
+  resources:
+  - apiservices
+  verbs: ["get", "patch"]
+- apiGroups:
   - admissionregistration.k8s.io
   resources:
   - mutatingwebhookconfigurations
   - validatingwebhookconfigurations
-  verbs: ["delete", "list", "watch", "patch"]
+  verbs: ["delete", "get", "list", "watch", "patch"]
 - apiGroups:
   - stash.appscode.com
   resources:
   - "*"
+  verbs: ["*"]
+- apiGroups:
+    - appcatalog.appscode.com
+  resources:
+    - "*"
   verbs: ["*"]
 - apiGroups:
   - apps
@@ -49,7 +59,13 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - persistentvolumeclaims
+  verbs: ["get","list","watch"]
+- apiGroups:
+  - ""
+  resources:
   - secrets
+  - services
   verbs: ["get"]
 - apiGroups:
   - ""

@@ -7,9 +7,7 @@ import (
 	"time"
 
 	"github.com/appscode/go/log"
-	core_util "github.com/appscode/kutil/core/v1"
-	rbac_util "github.com/appscode/kutil/rbac/v1"
-	"github.com/appscode/kutil/tools/queue"
+	"github.com/appscode/stash/apis"
 	api "github.com/appscode/stash/apis/stash/v1alpha1"
 	cs "github.com/appscode/stash/client/clientset/versioned"
 	stash_util "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1alpha1/util"
@@ -22,7 +20,7 @@ import (
 	"github.com/appscode/stash/pkg/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/push"
-	"gopkg.in/robfig/cron.v2"
+	cron "gopkg.in/robfig/cron.v2"
 	core "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -32,6 +30,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/reference"
+	core_util "kmodules.xyz/client-go/core/v1"
+	rbac_util "kmodules.xyz/client-go/rbac/v1"
+	"kmodules.xyz/client-go/tools/queue"
 )
 
 type Options struct {
@@ -321,7 +322,7 @@ func (c *Controller) runResticBackup(restic *api.Restic, repository *api.Reposit
 				}
 				in.LastBackupDuration = endTime.Sub(startTime.Time).String()
 				return in
-			}, api.EnableStatusSubresource)
+			}, apis.EnableStatusSubresource)
 		}
 	}()
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/appscode/go/log"
+	"github.com/appscode/stash/apis"
 	api "github.com/appscode/stash/apis/stash/v1alpha1"
 	"github.com/appscode/stash/client/clientset/versioned/scheme"
 	"github.com/appscode/stash/pkg/eventer"
@@ -21,17 +22,13 @@ import (
 	"k8s.io/client-go/tools/reference"
 )
 
-const (
-	LeaderElectionLease = 3 * time.Second
-)
-
 func (c *Controller) BackupScheduler() error {
 	stopBackup := make(chan struct{})
 	defer close(stopBackup)
 
 	// split code from here for leader election
 	switch c.opt.Workload.Kind {
-	case api.KindDeployment, api.KindReplicaSet, api.KindReplicationController:
+	case apis.KindDeployment, apis.KindReplicaSet, apis.KindReplicationController:
 		if err := c.electLeader(); err != nil {
 			return err
 		}
@@ -80,9 +77,9 @@ func (c *Controller) electLeader() error {
 	go func() {
 		leaderelection.RunOrDie(context.Background(), leaderelection.LeaderElectionConfig{
 			Lock:          resLock,
-			LeaseDuration: LeaderElectionLease,
-			RenewDeadline: LeaderElectionLease * 2 / 3,
-			RetryPeriod:   LeaderElectionLease / 3,
+			LeaseDuration: 15 * time.Second,
+			RenewDeadline: 10 * time.Second,
+			RetryPeriod:   2 * time.Second,
 			Callbacks: leaderelection.LeaderCallbacks{
 				OnStartedLeading: func(ctx context.Context) {
 					log.Infoln("Got leadership, preparing backup backup")

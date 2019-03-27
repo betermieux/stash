@@ -13,6 +13,8 @@ import (
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"kmodules.xyz/client-go/meta"
+	"kmodules.xyz/client-go/tools/clientcmd"
 )
 
 const defaultEtcdPathPrefix = "/registry/stash.appscode.com"
@@ -28,10 +30,14 @@ type StashOptions struct {
 func NewStashOptions(out, errOut io.Writer) *StashOptions {
 	o := &StashOptions{
 		// TODO we will nil out the etcd storage options.  This requires a later level of k8s.io/apiserver
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, server.Codecs.LegacyCodec(admissionv1beta1.SchemeGroupVersion)),
-		ExtraOptions:       NewExtraOptions(),
-		StdOut:             out,
-		StdErr:             errOut,
+		RecommendedOptions: genericoptions.NewRecommendedOptions(
+			defaultEtcdPathPrefix,
+			server.Codecs.LegacyCodec(admissionv1beta1.SchemeGroupVersion),
+			genericoptions.NewProcessInfo("stash-operator", meta.Namespace()),
+		),
+		ExtraOptions: NewExtraOptions(),
+		StdOut:       out,
+		StdErr:       errOut,
 	}
 	o.RecommendedOptions.Etcd = nil
 	o.RecommendedOptions.Admission = nil
@@ -62,8 +68,11 @@ func (o StashOptions) Config() (*server.StashConfig, error) {
 	if err := o.RecommendedOptions.ApplyTo(serverConfig, server.Scheme); err != nil {
 		return nil, err
 	}
+	// Fixes https://github.com/Azure/AKS/issues/522
+	clientcmd.Fix(serverConfig.ClientConfig)
+
 	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(v1alpha1.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(server.Scheme))
-	serverConfig.OpenAPIConfig.Info.Title = "stash-server"
+	serverConfig.OpenAPIConfig.Info.Title = "stash-operator"
 	serverConfig.OpenAPIConfig.Info.Version = v1alpha1.SchemeGroupVersion.Version
 	serverConfig.OpenAPIConfig.IgnorePrefixes = []string{
 		"/swaggerapi",
@@ -76,6 +85,13 @@ func (o StashOptions) Config() (*server.StashConfig, error) {
 		"/apis/admission.stash.appscode.com/v1alpha1/statefulsets",
 		"/apis/admission.stash.appscode.com/v1alpha1/replicationcontrollers",
 		"/apis/admission.stash.appscode.com/v1alpha1/replicasets",
+		// v1beta1 apis
+		"/apis/admission.stash.appscode.com/v1beta1/backupconfigurationtemplates",
+		"/apis/admission.stash.appscode.com/v1beta1/backupconfigurations",
+		"/apis/admission.stash.appscode.com/v1beta1/backupsessions",
+		"/apis/admission.stash.appscode.com/v1beta1/functions",
+		"/apis/admission.stash.appscode.com/v1beta1/restoresessions",
+		"/apis/admission.stash.appscode.com/v1beta1/tasks",
 	}
 
 	extraConfig := controller.NewConfig(serverConfig.ClientConfig)

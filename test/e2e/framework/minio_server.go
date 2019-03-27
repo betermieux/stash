@@ -7,8 +7,6 @@ import (
 
 	"github.com/appscode/go/crypto/rand"
 	"github.com/appscode/go/types"
-	apps_util "github.com/appscode/kutil/apps/v1"
-	core_util "github.com/appscode/kutil/core/v1"
 	. "github.com/onsi/gomega"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -16,6 +14,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/util/cert"
+	apps_util "kmodules.xyz/client-go/apps/v1"
+	core_util "kmodules.xyz/client-go/core/v1"
 )
 
 const (
@@ -117,21 +117,27 @@ func (fi *Invocation) CreatePersistentVolumeClaim(obj core.PersistentVolumeClaim
 }
 
 func (fi *Invocation) DeploymentForMinioServer() apps.Deployment {
+	labels := map[string]string{
+		"app": fi.app + "minio-server",
+	}
+
 	return apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rand.WithUniqSuffix("minio-server"),
 			Namespace: fi.namespace,
 		},
 		Spec: apps.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+
 			Strategy: apps.DeploymentStrategy{
 				Type: apps.RecreateDeploymentStrategyType,
 			},
 			Template: core.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					// minio service will select this pod using this label.
-					Labels: map[string]string{
-						"app": fi.app + "minio-server",
-					},
+					Labels: labels,
 				},
 				Spec: core.PodSpec{
 					// this volumes will be mounted on minio server container
