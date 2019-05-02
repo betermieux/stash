@@ -2,12 +2,14 @@ package controller
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/appscode/go/log"
 	"github.com/appscode/stash/apis"
 	"github.com/appscode/stash/apis/stash"
 	api_v1beta1 "github.com/appscode/stash/apis/stash/v1beta1"
 	stash_scheme "github.com/appscode/stash/client/clientset/versioned/scheme"
+	stash_util "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1beta1/util"
 	v1beta1_util "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1beta1/util"
 	"github.com/appscode/stash/pkg/eventer"
 	"github.com/appscode/stash/pkg/resolve"
@@ -37,9 +39,9 @@ func (c *StashController) NewRestoreSessionWebhook() hooks.AdmissionHook {
 		schema.GroupVersionResource{
 			Group:    "admission.stash.appscode.com",
 			Version:  "v1beta1",
-			Resource: api_v1beta1.ResourcePluralRestoreSession,
+			Resource: "restoresessionvalidators",
 		},
-		api_v1beta1.ResourceSingularRestoreSession,
+		"restoresessionvalidator",
 		[]string{stash.GroupName},
 		api_v1beta1.SchemeGroupVersion.WithKind(api_v1beta1.ResourceKindRestoreSession),
 		nil,
@@ -119,9 +121,20 @@ func (c *StashController) runRestoreSessionProcessor(key string) error {
 				return err
 			}
 
-			// don't process further if RestoreSession has been processed already
-			if !util.RestorePending(restoreSession.Status.Phase) {
-				log.Infoln("No pending RestoreSession. Skipping creating new restore job.")
+			if restoreSession.Status.Phase == api_v1beta1.RestoreSessionFailed ||
+				restoreSession.Status.Phase == api_v1beta1.RestoreSessionSucceeded {
+				log.Infof("Skipping processing RestoreSession %s/%s. Reason: phase is %q.", restoreSession.Namespace, restoreSession.Name, restoreSession.Status.Phase)
+				return nil
+			}
+			// check weather restore session is completed or running and set it's phase accordingly
+			phase, err := c.getRestoreSessionPhase(restoreSession)
+
+			if err != nil || phase == api_v1beta1.RestoreSessionFailed {
+				return c.setRestoreSessionFailed(restoreSession, err)
+			} else if phase == api_v1beta1.RestoreSessionSucceeded {
+				return c.setRestoreSessionSucceeded(restoreSession)
+			} else if phase == api_v1beta1.RestoreSessionRunning {
+				log.Infof("Skipping processing RestoreSession %s/%s. Reason: phase is %q.", restoreSession.Namespace, restoreSession.Name, restoreSession.Status.Phase)
 				return nil
 			}
 
@@ -136,6 +149,7 @@ func (c *StashController) runRestoreSessionProcessor(key string) error {
 				if err != nil {
 					return err
 				}
+				return c.setRestoreSessionRunning(restoreSession)
 			} else {
 
 				// target is not a workload. we have to restore by a job. create restore job.
@@ -145,10 +159,7 @@ func (c *StashController) runRestoreSessionProcessor(key string) error {
 				}
 
 				// restore job has been created successfully. set RestoreSession phase to "Running"
-				err = c.setRestoreSessionRunning(restoreSession)
-				if err != nil {
-					return err
-				}
+				return c.setRestoreSessionRunning(restoreSession)
 			}
 		}
 
@@ -197,16 +208,32 @@ func (c *StashController) ensureRestoreJob(restoreSession *api_v1beta1.RestoreSe
 		}
 	}
 
+	// get repository for backupConfig
+	repository, err := c.stashClient.StashV1alpha1().Repositories(restoreSession.Namespace).Get(
+		restoreSession.Spec.Repository.Name,
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		return err
+	}
+
 	// resolve task template
+
 	explicitInputs := make(map[string]string)
 	for _, param := range restoreSession.Spec.Task.Params {
 		explicitInputs[param.Name] = param.Value
 	}
 
-	implicitInputs, err := c.inputsForRestoreSession(*restoreSession)
+	repoInputs, err := c.inputsForRepository(repository)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot resolve implicit inputs for Repository %s/%s, reason: %s", repository.Namespace, repository.Name, err)
 	}
+	rsInputs, err := c.inputsForRestoreSession(*restoreSession)
+	if err != nil {
+		return fmt.Errorf("cannot resolve implicit inputs for RestoreSession %s/%s, reason: %s", restoreSession.Namespace, restoreSession.Name, err)
+	}
+
+	implicitInputs := core_util.UpsertMap(repoInputs, rsInputs)
 	implicitInputs[apis.Namespace] = restoreSession.Namespace
 	implicitInputs[apis.RestoreSession] = restoreSession.Name
 	implicitInputs[apis.StatusSubresourceEnabled] = fmt.Sprint(apis.EnableStatusSubresource)
@@ -216,10 +243,15 @@ func (c *StashController) ensureRestoreJob(restoreSession *api_v1beta1.RestoreSe
 		TaskName:        restoreSession.Spec.Task.Name,
 		Inputs:          core_util.UpsertMap(explicitInputs, implicitInputs),
 		RuntimeSettings: restoreSession.Spec.RuntimeSettings,
+		TempDir:         restoreSession.Spec.TempDir,
 	}
 	podSpec, err := taskResolver.GetPodSpec()
 	if err != nil {
 		return err
+	}
+	// for local backend, attach volume to all containers
+	if repository.Spec.Backend.Local != nil {
+		podSpec = util.AttachLocalBackend(podSpec, *repository.Spec.Backend.Local)
 	}
 
 	// create Restore Job
@@ -229,8 +261,8 @@ func (c *StashController) ensureRestoreJob(restoreSession *api_v1beta1.RestoreSe
 		in.Labels = map[string]string{
 			// job controller should not delete this job on completion
 			// use a different label than v1alpha1 job labels to skip deletion from job controller
-			// TODO: Remove job controller, cleanup backup-session periodically
-			util.LabelApp: util.AppLabelStash,
+			// TODO: Remove job controller, cleanup restore-session periodically
+			util.LabelApp: util.AppLabelStashV1Beta1,
 		}
 		in.Spec.Template.Spec = podSpec
 		if c.EnableRBAC {
@@ -246,7 +278,7 @@ func (c *StashController) setRestoreSessionFailed(restoreSession *api_v1beta1.Re
 
 	// set RestoreSession phase to "Failed"
 	_, err := v1beta1_util.UpdateRestoreSessionStatus(c.stashClient.StashV1beta1(), restoreSession, func(in *api_v1beta1.RestoreSessionStatus) *api_v1beta1.RestoreSessionStatus {
-		in.Phase = api_v1beta1.RestoreFailed
+		in.Phase = api_v1beta1.RestoreSessionFailed
 		return in
 	}, apis.EnableStatusSubresource)
 	if err != nil {
@@ -268,9 +300,15 @@ func (c *StashController) setRestoreSessionFailed(restoreSession *api_v1beta1.Re
 
 func (c *StashController) setRestoreSessionRunning(restoreSession *api_v1beta1.RestoreSession) error {
 
+	totalHosts, err := c.getTotalHosts(restoreSession.Spec.Target, restoreSession.Namespace)
+	if err != nil {
+		return err
+	}
+
 	// set RestoreSession phase to "Running"
-	_, err := v1beta1_util.UpdateRestoreSessionStatus(c.stashClient.StashV1beta1(), restoreSession, func(in *api_v1beta1.RestoreSessionStatus) *api_v1beta1.RestoreSessionStatus {
-		in.Phase = api_v1beta1.RestoreRunning
+	_, err = v1beta1_util.UpdateRestoreSessionStatus(c.stashClient.StashV1beta1(), restoreSession, func(in *api_v1beta1.RestoreSessionStatus) *api_v1beta1.RestoreSessionStatus {
+		in.Phase = api_v1beta1.RestoreSessionRunning
+		in.TotalHosts = totalHosts
 		return in
 	}, apis.EnableStatusSubresource)
 	if err != nil {
@@ -288,4 +326,63 @@ func (c *StashController) setRestoreSessionRunning(restoreSession *api_v1beta1.R
 	)
 
 	return err
+}
+
+func (c *StashController) setRestoreSessionSucceeded(restoreSession *api_v1beta1.RestoreSession) error {
+
+	// total restore session duration is sum of individual host restore duration
+	var sessionDuration time.Duration
+	for _, hostStats := range restoreSession.Status.Stats {
+		hostRestoreDuration, err := time.ParseDuration(hostStats.Duration)
+		if err != nil {
+			return err
+		}
+		sessionDuration = sessionDuration + hostRestoreDuration
+	}
+
+	// update RestoreSession status
+	_, err := stash_util.UpdateRestoreSessionStatus(c.stashClient.StashV1beta1(), restoreSession, func(in *api_v1beta1.RestoreSessionStatus) *api_v1beta1.RestoreSessionStatus {
+		in.Phase = api_v1beta1.RestoreSessionSucceeded
+		in.SessionDuration = sessionDuration.String()
+		return in
+	}, apis.EnableStatusSubresource)
+	if err != nil {
+		return err
+	}
+
+	// write job creation success event
+	_, err = eventer.CreateEvent(
+		c.kubeClient,
+		eventer.RestoreSessionEventComponent,
+		restoreSession,
+		core.EventTypeNormal,
+		eventer.EventReasonRestoreSessionSucceeded,
+		fmt.Sprintf("restore has been completed succesfully for RestoreSession %s/%s", restoreSession.Namespace, restoreSession.Name),
+	)
+
+	return err
+}
+
+func (c *StashController) getRestoreSessionPhase(restoreSession *api_v1beta1.RestoreSession) (api_v1beta1.RestoreSessionPhase, error) {
+	// RestoreSession phase is empty or "Pending" then return it. controller will process accordingly
+	if restoreSession.Status.TotalHosts == nil ||
+		restoreSession.Status.Phase == "" ||
+		restoreSession.Status.Phase == api_v1beta1.RestoreSessionPending {
+		return api_v1beta1.RestoreSessionPending, nil
+	}
+
+	// all hosts hasn't completed it's restore process. RestoreSession phase must be "Running".
+	if *restoreSession.Status.TotalHosts != int32(len(restoreSession.Status.Stats)) {
+		return api_v1beta1.RestoreSessionRunning, nil
+	}
+
+	// check if any of the host has failed to restore. if any of them has failed, then consider entire restore session as a failure.
+	for _, host := range restoreSession.Status.Stats {
+		if host.Phase == api_v1beta1.HostRestoreFailed {
+			return api_v1beta1.RestoreSessionFailed, fmt.Errorf("restore failed for host: %s. Reason: %s", host.Hostname, host.Error)
+		}
+	}
+
+	// restore has been completed successfully
+	return api_v1beta1.RestoreSessionSucceeded, nil
 }

@@ -503,6 +503,9 @@ spec:
                 default or override container images in workload controllers like
                 Deployments and StatefulSets.'
               type: string
+            podSecurityPolicyName:
+              description: Name of PodSecurityPolicy(PSP) required by this function
+              type: string
             ports:
               description: List of ports to expose from the container. Exposing a
                 port here gives the system additional information about the network
@@ -542,6 +545,15 @@ spec:
               type: array
             runtimeSettings:
               properties:
+                ionice:
+                  description: https://linux.die.net/man/1/ionice
+                  properties:
+                    class:
+                      format: int32
+                      type: integer
+                    classData:
+                      format: int32
+                      type: integer
                 lifecycle:
                   description: Lifecycle describes actions that the management system
                     should take in response to container lifecycle events. For the
@@ -790,6 +802,12 @@ spec:
                       description: 'Number of seconds after which the probe times
                         out. Defaults to 1 second. Minimum value is 1. More info:
                         https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                      format: int32
+                      type: integer
+                nice:
+                  description: https://linux.die.net/man/1/nice
+                  properties:
+                    adjustment:
                       format: int32
                       type: integer
                 readinessProbe:

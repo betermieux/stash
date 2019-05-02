@@ -5,6 +5,7 @@ import (
 
 	"github.com/appscode/go/flags"
 	"github.com/appscode/stash/pkg/restic"
+	"github.com/appscode/stash/pkg/util"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/errors"
 )
@@ -16,8 +17,10 @@ const (
 func NewCmdRestorePVC() *cobra.Command {
 	var (
 		outputDir  string
-		restoreOpt restic.RestoreOptions
-		setupOpt   = restic.SetupOptions{
+		restoreOpt = restic.RestoreOptions{
+			Host: restic.DefaultHost,
+		}
+		setupOpt = restic.SetupOptions{
 			ScratchDir:  restic.DefaultScratchDir,
 			EnableCache: false,
 		}
@@ -32,6 +35,18 @@ func NewCmdRestorePVC() *cobra.Command {
 		DisableAutoGenTag: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			flags.EnsureRequiredFlags(cmd, "restore-dirs", "provider", "secret-dir")
+
+			// apply nice, ionice settings from env
+			var err error
+			setupOpt.Nice, err = util.NiceSettingsFromEnv()
+			if err != nil {
+				return handleResticError(outputDir, restic.DefaultOutputFileName, err)
+			}
+			setupOpt.IONice, err = util.IONiceSettingsFromEnv()
+			if err != nil {
+				return handleResticError(outputDir, restic.DefaultOutputFileName, err)
+			}
+
 			// init restic wrapper
 			resticWrapper, err := restic.NewResticWrapper(setupOpt)
 			if err != nil {
@@ -60,10 +75,12 @@ func NewCmdRestorePVC() *cobra.Command {
 	cmd.Flags().StringVar(&setupOpt.Provider, "provider", setupOpt.Provider, "Backend provider (i.e. gcs, s3, azure etc)")
 	cmd.Flags().StringVar(&setupOpt.Bucket, "bucket", setupOpt.Bucket, "Name of the cloud bucket/container (keep empty for local backend)")
 	cmd.Flags().StringVar(&setupOpt.Endpoint, "endpoint", setupOpt.Endpoint, "Endpoint for s3/s3 compatible backend")
+	cmd.Flags().StringVar(&setupOpt.URL, "rest-server-url", setupOpt.URL, "URL for rest backend")
 	cmd.Flags().StringVar(&setupOpt.Path, "path", setupOpt.Path, "Directory inside the bucket where restore will be stored")
 	cmd.Flags().StringVar(&setupOpt.SecretDir, "secret-dir", setupOpt.SecretDir, "Directory where storage secret has been mounted")
 	cmd.Flags().StringVar(&setupOpt.ScratchDir, "scratch-dir", setupOpt.ScratchDir, "Temporary directory")
 	cmd.Flags().BoolVar(&setupOpt.EnableCache, "enable-cache", setupOpt.EnableCache, "Specify weather to enable caching for restic")
+	cmd.Flags().IntVar(&setupOpt.MaxConnections, "max-connections", setupOpt.MaxConnections, "Specify maximum concurrent connections for GCS, Azure and B2 backend")
 
 	cmd.Flags().StringVar(&restoreOpt.Host, "hostname", restoreOpt.Host, "Name of the host machine")
 	cmd.Flags().StringSliceVar(&restoreOpt.RestoreDirs, "restore-dirs", restoreOpt.RestoreDirs, "List of directories to be restored")

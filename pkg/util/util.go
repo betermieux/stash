@@ -4,14 +4,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
+	"github.com/appscode/go/types"
 	"github.com/appscode/stash/apis"
 	api_v1beta1 "github.com/appscode/stash/apis/stash/v1beta1"
 	"github.com/appscode/stash/pkg/restic"
 	"github.com/pkg/errors"
+	core "k8s.io/api/core/v1"
+	core_util "kmodules.xyz/client-go/core/v1"
 	"kmodules.xyz/client-go/meta"
 	store "kmodules.xyz/objectstore-api/api/v1"
+	v1 "kmodules.xyz/offshoot-api/api/v1"
 )
 
 var (
@@ -39,7 +44,7 @@ func GetHostName(target *api_v1beta1.Target) (string, error) {
 		podOrdinal := podInfo[len(podInfo)-1]
 		return "host-" + podOrdinal, nil
 	case apis.KindDaemonSet:
-		nodeName := os.Getenv("POD_NAME")
+		nodeName := os.Getenv("NODE_NAME")
 		if nodeName == "" {
 			return "", fmt.Errorf("missing nodeName for %s", apis.KindDaemonSet)
 		}
@@ -56,7 +61,7 @@ func PushgatewayURL() string {
 
 func BackupModel(kind string) string {
 	switch kind {
-	case apis.KindDeployment, apis.KindReplicaSet, apis.KindReplicationController, apis.KindStatefulSet, apis.KindDaemonSet:
+	case apis.KindDeployment, apis.KindReplicaSet, apis.KindReplicationController, apis.KindStatefulSet, apis.KindDaemonSet, apis.KindDeploymentConfig:
 		return ModelSidecar
 	default:
 		return ModelCronJob
@@ -115,6 +120,7 @@ func GetEndpoint(backend *store.Backend) string {
 	return ""
 }
 
+// TODO: move to store
 func GetBucketAndPrefix(backend *store.Backend) (string, string, error) {
 	if backend.Local != nil {
 		return "", filepath.Join(backend.Local.MountPath, strings.TrimPrefix(backend.Local.SubPath, "/")), nil
@@ -126,11 +132,13 @@ func GetBucketAndPrefix(backend *store.Backend) (string, string, error) {
 		return backend.Azure.Container, backend.Azure.Prefix, nil
 	} else if backend.Swift != nil {
 		return backend.Swift.Container, backend.Swift.Prefix, nil
+	} else if backend.Rest != nil {
+		return "", "", nil
 	}
 	return "", "", errors.New("unknown backend type.")
 }
 
-// TODO: use constant / move to store
+// TODO: move to store
 func GetProvider(backend store.Backend) (string, error) {
 	if backend.Local != nil {
 		return restic.ProviderLocal, nil
@@ -144,8 +152,23 @@ func GetProvider(backend store.Backend) (string, error) {
 		return restic.ProviderSwift, nil
 	} else if backend.B2 != nil {
 		return restic.ProviderB2, nil
+	} else if backend.Rest != nil {
+		return restic.ProviderRest, nil
 	}
-	return "", errors.New("unknown backend type.")
+	return "", errors.New("unknown provider.")
+}
+
+// TODO: move to store
+// returns 0 if not specified
+func GetMaxConnections(backend store.Backend) int {
+	if backend.GCS != nil {
+		return backend.GCS.MaxConnections
+	} else if backend.Azure != nil {
+		return backend.GCS.MaxConnections
+	} else if backend.B2 != nil {
+		return backend.GCS.MaxConnections
+	}
+	return 0
 }
 
 func ExtractDataFromRepositoryLabel(labels map[string]string) (data RepoLabelData, err error) {
@@ -170,4 +193,62 @@ func ExtractDataFromRepositoryLabel(labels map[string]string) (data RepoLabelDat
 		data.NodeName = ""
 	}
 	return data, nil
+}
+
+func AttachLocalBackend(podSpec core.PodSpec, localSpec store.LocalSpec) core.PodSpec {
+	volume, mount := localSpec.ToVolumeAndMount(LocalVolumeName)
+	podSpec.Volumes = core_util.UpsertVolume(podSpec.Volumes, volume)
+	for i := range podSpec.InitContainers {
+		podSpec.InitContainers[i].VolumeMounts = core_util.UpsertVolumeMount(podSpec.InitContainers[i].VolumeMounts, mount)
+	}
+	for i := range podSpec.Containers {
+		podSpec.Containers[i].VolumeMounts = core_util.UpsertVolumeMount(podSpec.Containers[i].VolumeMounts, mount)
+	}
+	return podSpec
+}
+
+func NiceSettingsFromEnv() (*v1.NiceSettings, error) {
+	var settings *v1.NiceSettings
+	if v, ok := os.LookupEnv(apis.NiceAdjustment); ok {
+		vi, err := ParseInt32P(v)
+		if err != nil {
+			return nil, err
+		}
+		settings = &v1.NiceSettings{
+			Adjustment: vi,
+		}
+	}
+	return settings, nil
+}
+
+func IONiceSettingsFromEnv() (*v1.IONiceSettings, error) {
+	var settings *v1.IONiceSettings
+	if v, ok := os.LookupEnv(apis.IONiceClass); ok {
+		vi, err := ParseInt32P(v)
+		if err != nil {
+			return nil, err
+		}
+		settings = &v1.IONiceSettings{
+			Class: vi,
+		}
+	}
+	if v, ok := os.LookupEnv(apis.IONiceClassData); ok {
+		vi, err := ParseInt32P(v)
+		if err != nil {
+			return nil, err
+		}
+		if settings == nil {
+			settings = &v1.IONiceSettings{}
+		}
+		settings.ClassData = vi
+	}
+	return settings, nil
+}
+
+func ParseInt32P(v string) (*int32, error) {
+	vi, err := strconv.Atoi(v)
+	if err != nil {
+		return nil, err
+	}
+	return types.Int32P(int32(vi)), nil
 }

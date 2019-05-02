@@ -9,6 +9,8 @@ import (
 	v "github.com/appscode/go/version"
 	"github.com/appscode/stash/apis"
 	"github.com/appscode/stash/client/clientset/versioned/scheme"
+	stash_cli "github.com/appscode/stash/pkg/cmds/cli"
+	"github.com/appscode/stash/pkg/cmds/docker"
 	"github.com/appscode/stash/pkg/util"
 	"github.com/spf13/cobra"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -16,6 +18,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"kmodules.xyz/client-go/logs"
 	"kmodules.xyz/client-go/tools/cli"
+	ocscheme "kmodules.xyz/openshift/client/clientset/versioned/scheme"
 )
 
 func NewRootCmd() *cobra.Command {
@@ -30,6 +33,8 @@ func NewRootCmd() *cobra.Command {
 
 			scheme.AddToScheme(clientsetscheme.Scheme)
 			scheme.AddToScheme(legacyscheme.Scheme)
+			ocscheme.AddToScheme(clientsetscheme.Scheme)
+			ocscheme.AddToScheme(legacyscheme.Scheme)
 			cli.LoggerOptions = golog.ParseFlags(c.Flags())
 		},
 	}
@@ -42,17 +47,33 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(v.NewCmdVersion())
 	stopCh := genericapiserver.SetupSignalHandler()
 	rootCmd.AddCommand(NewCmdRun(os.Stdout, os.Stderr, stopCh))
+
 	rootCmd.AddCommand(NewCmdBackup())
-	rootCmd.AddCommand(NewCmdBackupPVC())
-	rootCmd.AddCommand(NewCmdRestorePVC())
-	rootCmd.AddCommand(NewCmdUpdateStatus())
 	rootCmd.AddCommand(NewCmdRecover())
 	rootCmd.AddCommand(NewCmdCheck())
 	rootCmd.AddCommand(NewCmdScaleDown())
 	rootCmd.AddCommand(NewCmdSnapshots())
 	rootCmd.AddCommand(NewCmdForget())
-	rootCmd.AddCommand(NewBackupSession())
+	rootCmd.AddCommand(NewCmdCreateBackupSession())
 	rootCmd.AddCommand(NewCmdRestore())
+	rootCmd.AddCommand(NewCmdRunBackup())
+
+	rootCmd.AddCommand(NewCmdBackupPVC())
+	rootCmd.AddCommand(NewCmdRestorePVC())
+
+	rootCmd.AddCommand(NewCmdBackupPG())
+	rootCmd.AddCommand(NewCmdRestorePG())
+
+	rootCmd.AddCommand(NewCmdBackupMySql())
+	rootCmd.AddCommand(NewCmdRestoreMySql())
+
+	rootCmd.AddCommand(NewCmdBackupMongo())
+	rootCmd.AddCommand(NewCmdRestoreMongo())
+
+	rootCmd.AddCommand(NewCmdUpdateStatus())
+
+	rootCmd.AddCommand(stash_cli.NewCLICmd())
+	rootCmd.AddCommand(docker.NewDockerCmd())
 
 	return rootCmd
 }

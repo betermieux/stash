@@ -11,6 +11,7 @@ const (
 	RepositoryBucket     = "REPOSITORY_BUCKET"
 	RepositoryPrefix     = "REPOSITORY_PREFIX"
 	RepositoryEndpoint   = "REPOSITORY_ENDPOINT"
+	RepositoryURL        = "REPOSITORY_URL"
 
 	Hostname = "HOSTNAME"
 
@@ -33,6 +34,16 @@ const (
 	RetentionKeepTags    = "RETENTION_KEEP_TAGS"
 	RetentionPrune       = "RETENTION_PRUNE"
 	RetentionDryRun      = "RETENTION_DRY_RUN"
+
+	// default true
+	// false when TmpDir.DisableCaching is true in backupConfig/restoreSession
+	EnableCache    = "ENABLE_CACHE"
+	MaxConnections = "MAX_CONNECTIONS"
+
+	// from runtime settings
+	NiceAdjustment  = "NICE_ADJUSTMENT"
+	IONiceClass     = "IONICE_CLASS"
+	IONiceClassData = "IONICE_CLASS_DATA"
 
 	StatusSubresourceEnabled = "ENABLE_STATUS_SUBRESOURCE"
 )

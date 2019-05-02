@@ -3,6 +3,7 @@ package restic
 import (
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path/filepath"
 )
@@ -14,6 +15,7 @@ const (
 	ProviderAzure = "azure"
 	ProviderSwift = "swift"
 	ProviderB2    = "b2"
+	ProviderRest  = "rest"
 
 	RESTIC_REPOSITORY = "RESTIC_REPOSITORY"
 	RESTIC_PASSWORD   = "RESTIC_PASSWORD"
@@ -56,6 +58,10 @@ const (
 
 	// For using certs in Minio server or REST server
 	CA_CERT_DATA = "CA_CERT_DATA"
+
+	// ref: https://github.com/restic/restic/blob/master/doc/manual_rest.rst#temporary-files
+	resticTempDir  = "restic-tmp"
+	resticCacheDir = "restic-cache"
 )
 
 func (w *ResticWrapper) setupEnv() error {
@@ -66,23 +72,23 @@ func (w *ResticWrapper) setupEnv() error {
 		w.sh.SetEnv(RESTIC_PASSWORD, string(v))
 	}
 
-	if v, err := ioutil.ReadFile(filepath.Join(w.config.SecretDir, CA_CERT_DATA)); err == nil {
-		certDir := filepath.Join(w.config.ScratchDir, "cacerts")
-		if err2 := os.MkdirAll(certDir, 0755); err2 != nil {
-			return err
-		}
-
-		w.config.CacertFile = filepath.Join(certDir, "ca.crt")
-		if err3 := ioutil.WriteFile(w.config.CacertFile, v, 0755); err3 != nil {
-			return err
-		}
+	if _, err := os.Stat(filepath.Join(w.config.SecretDir, CA_CERT_DATA)); err == nil {
+		// ca-cert file exists
+		w.config.CacertFile = filepath.Join(w.config.SecretDir, CA_CERT_DATA)
 	}
 
-	tmpDir := filepath.Join(w.config.ScratchDir, "restic-tmp")
+	tmpDir := filepath.Join(w.config.ScratchDir, resticTempDir)
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
 		return err
 	}
 	w.sh.SetEnv(TMPDIR, tmpDir)
+
+	if w.config.EnableCache {
+		cacheDir := filepath.Join(w.config.ScratchDir, resticCacheDir)
+		if err := os.MkdirAll(cacheDir, 0755); err != nil {
+			return err
+		}
+	}
 
 	//path = strings.TrimPrefix(path, "/")
 
@@ -114,13 +120,9 @@ func (w *ResticWrapper) setupEnv() error {
 			w.sh.SetEnv(GOOGLE_PROJECT_ID, string(v))
 		}
 
-		jsonKeyPath := filepath.Join(w.config.ScratchDir, "gcs_sa.json")
-		if v, err := ioutil.ReadFile(filepath.Join(w.config.SecretDir, GOOGLE_SERVICE_ACCOUNT_JSON_KEY)); err == nil {
-			err2 := ioutil.WriteFile(jsonKeyPath, v, 0600)
-			if err != nil {
-				return err2
-			}
-			w.sh.SetEnv(GOOGLE_APPLICATION_CREDENTIALS, jsonKeyPath)
+		if _, err := os.Stat(filepath.Join(w.config.SecretDir, GOOGLE_SERVICE_ACCOUNT_JSON_KEY)); err == nil {
+			// json key file exists
+			w.sh.SetEnv(GOOGLE_APPLICATION_CREDENTIALS, filepath.Join(w.config.SecretDir, GOOGLE_SERVICE_ACCOUNT_JSON_KEY))
 		}
 
 	case ProviderAzure:
@@ -199,6 +201,22 @@ func (w *ResticWrapper) setupEnv() error {
 		if v, err := ioutil.ReadFile(filepath.Join(w.config.SecretDir, B2_ACCOUNT_KEY)); err == nil {
 			w.sh.SetEnv(B2_ACCOUNT_KEY, string(v))
 		}
+
+	case ProviderRest:
+		u, err := url.Parse(w.config.URL)
+		if err != nil {
+			return err
+		}
+		if username, err := ioutil.ReadFile(filepath.Join(w.config.SecretDir, REST_SERVER_USERNAME)); err == nil {
+			if password, err := ioutil.ReadFile(filepath.Join(w.config.SecretDir, REST_SERVER_PASSWORD)); err == nil {
+				u.User = url.UserPassword(string(username), string(password))
+			} else {
+				u.User = url.User(string(username))
+			}
+		}
+		// u.Path = filepath.Join(u.Path, w.config.Path) // path integrated with url
+		r := fmt.Sprintf("rest:%s", u.String())
+		w.sh.SetEnv(RESTIC_REPOSITORY, r)
 	}
 
 	return nil

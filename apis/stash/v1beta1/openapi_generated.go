@@ -45,18 +45,21 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/appscode/stash/apis/stash/v1beta1.BackupSessionList":               schema_stash_apis_stash_v1beta1_BackupSessionList(ref),
 		"github.com/appscode/stash/apis/stash/v1beta1.BackupSessionSpec":               schema_stash_apis_stash_v1beta1_BackupSessionSpec(ref),
 		"github.com/appscode/stash/apis/stash/v1beta1.BackupSessionStatus":             schema_stash_apis_stash_v1beta1_BackupSessionStatus(ref),
-		"github.com/appscode/stash/apis/stash/v1beta1.BackupStats":                     schema_stash_apis_stash_v1beta1_BackupStats(ref),
+		"github.com/appscode/stash/apis/stash/v1beta1.EmptyDirSettings":                schema_stash_apis_stash_v1beta1_EmptyDirSettings(ref),
 		"github.com/appscode/stash/apis/stash/v1beta1.FileStats":                       schema_stash_apis_stash_v1beta1_FileStats(ref),
 		"github.com/appscode/stash/apis/stash/v1beta1.Function":                        schema_stash_apis_stash_v1beta1_Function(ref),
 		"github.com/appscode/stash/apis/stash/v1beta1.FunctionList":                    schema_stash_apis_stash_v1beta1_FunctionList(ref),
 		"github.com/appscode/stash/apis/stash/v1beta1.FunctionRef":                     schema_stash_apis_stash_v1beta1_FunctionRef(ref),
 		"github.com/appscode/stash/apis/stash/v1beta1.FunctionSpec":                    schema_stash_apis_stash_v1beta1_FunctionSpec(ref),
+		"github.com/appscode/stash/apis/stash/v1beta1.HostBackupStats":                 schema_stash_apis_stash_v1beta1_HostBackupStats(ref),
+		"github.com/appscode/stash/apis/stash/v1beta1.HostRestoreStats":                schema_stash_apis_stash_v1beta1_HostRestoreStats(ref),
 		"github.com/appscode/stash/apis/stash/v1beta1.Param":                           schema_stash_apis_stash_v1beta1_Param(ref),
 		"github.com/appscode/stash/apis/stash/v1beta1.RestoreSession":                  schema_stash_apis_stash_v1beta1_RestoreSession(ref),
 		"github.com/appscode/stash/apis/stash/v1beta1.RestoreSessionList":              schema_stash_apis_stash_v1beta1_RestoreSessionList(ref),
 		"github.com/appscode/stash/apis/stash/v1beta1.RestoreSessionSpec":              schema_stash_apis_stash_v1beta1_RestoreSessionSpec(ref),
 		"github.com/appscode/stash/apis/stash/v1beta1.RestoreSessionStatus":            schema_stash_apis_stash_v1beta1_RestoreSessionStatus(ref),
 		"github.com/appscode/stash/apis/stash/v1beta1.Rule":                            schema_stash_apis_stash_v1beta1_Rule(ref),
+		"github.com/appscode/stash/apis/stash/v1beta1.SnapshotStats":                   schema_stash_apis_stash_v1beta1_SnapshotStats(ref),
 		"github.com/appscode/stash/apis/stash/v1beta1.Target":                          schema_stash_apis_stash_v1beta1_Target(ref),
 		"github.com/appscode/stash/apis/stash/v1beta1.TargetRef":                       schema_stash_apis_stash_v1beta1_TargetRef(ref),
 		"github.com/appscode/stash/apis/stash/v1beta1.Task":                            schema_stash_apis_stash_v1beta1_Task(ref),
@@ -313,6 +316,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"kmodules.xyz/objectstore-api/api/v1.S3Spec":                                   schema_kmodulesxyz_objectstore_api_api_v1_S3Spec(ref),
 		"kmodules.xyz/objectstore-api/api/v1.SwiftSpec":                                schema_kmodulesxyz_objectstore_api_api_v1_SwiftSpec(ref),
 		"kmodules.xyz/offshoot-api/api/v1.ContainerRuntimeSettings":                    schema_kmodulesxyz_offshoot_api_api_v1_ContainerRuntimeSettings(ref),
+		"kmodules.xyz/offshoot-api/api/v1.IONiceSettings":                              schema_kmodulesxyz_offshoot_api_api_v1_IONiceSettings(ref),
+		"kmodules.xyz/offshoot-api/api/v1.NiceSettings":                                schema_kmodulesxyz_offshoot_api_api_v1_NiceSettings(ref),
 		"kmodules.xyz/offshoot-api/api/v1.ObjectMeta":                                  schema_kmodulesxyz_offshoot_api_api_v1_ObjectMeta(ref),
 		"kmodules.xyz/offshoot-api/api/v1.PodRuntimeSettings":                          schema_kmodulesxyz_offshoot_api_api_v1_PodRuntimeSettings(ref),
 		"kmodules.xyz/offshoot-api/api/v1.PodSpec":                                     schema_kmodulesxyz_offshoot_api_api_v1_PodSpec(ref),
@@ -465,12 +470,18 @@ func schema_stash_apis_stash_v1beta1_BackupConfigurationSpec(ref common.Referenc
 							Ref:         ref("kmodules.xyz/offshoot-api/api/v1.RuntimeSettings"),
 						},
 					},
+					"tempDir": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Temp directory configuration for functions/sidecar An `EmptyDir` will always be mounted at /tmp with this settings",
+							Ref:         ref("github.com/appscode/stash/apis/stash/v1beta1.EmptyDirSettings"),
+						},
+					},
 				},
 				Required: []string{"repository"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/appscode/stash/apis/stash/v1alpha1.RetentionPolicy", "github.com/appscode/stash/apis/stash/v1beta1.Target", "github.com/appscode/stash/apis/stash/v1beta1.TaskRef", "k8s.io/api/core/v1.LocalObjectReference", "kmodules.xyz/offshoot-api/api/v1.RuntimeSettings"},
+			"github.com/appscode/stash/apis/stash/v1alpha1.RetentionPolicy", "github.com/appscode/stash/apis/stash/v1beta1.EmptyDirSettings", "github.com/appscode/stash/apis/stash/v1beta1.Target", "github.com/appscode/stash/apis/stash/v1beta1.TaskRef", "k8s.io/api/core/v1.LocalObjectReference", "kmodules.xyz/offshoot-api/api/v1.RuntimeSettings"},
 	}
 }
 
@@ -597,11 +608,17 @@ func schema_stash_apis_stash_v1beta1_BackupConfigurationTemplateSpec(ref common.
 							Ref:         ref("kmodules.xyz/offshoot-api/api/v1.RuntimeSettings"),
 						},
 					},
+					"tempDir": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Temp directory configuration for functions/sidecar An `EmptyDir` will always be mounted at /tmp with this settings",
+							Ref:         ref("github.com/appscode/stash/apis/stash/v1beta1.EmptyDirSettings"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/appscode/stash/apis/stash/v1alpha1.RetentionPolicy", "github.com/appscode/stash/apis/stash/v1beta1.TaskRef", "kmodules.xyz/objectstore-api/api/v1.Backend", "kmodules.xyz/offshoot-api/api/v1.RuntimeSettings"},
+			"github.com/appscode/stash/apis/stash/v1alpha1.RetentionPolicy", "github.com/appscode/stash/apis/stash/v1beta1.EmptyDirSettings", "github.com/appscode/stash/apis/stash/v1beta1.TaskRef", "kmodules.xyz/objectstore-api/api/v1.Backend", "kmodules.xyz/offshoot-api/api/v1.RuntimeSettings"},
 	}
 }
 
@@ -723,19 +740,33 @@ func schema_stash_apis_stash_v1beta1_BackupSessionStatus(ref common.ReferenceCal
 					},
 					"phase": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Phase indicates the phase of the backup process for this BackupSession",
+							Description: "Phase indicates the overall phase of the backup process for this BackupSession. Phase will be \"Succeeded\" only if phase of all hosts are \"Succeeded\". If any of the host fail to complete backup, Phase will be \"Failed\".",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"totalHosts": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TotalHosts specifies total number of hosts that will be backed up for this BackupSession",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"sessionDuration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SessionDuration specify total time taken to complete current backup session (sum of backup duration of all hosts)",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"stats": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Stats shows statistics of this backup session",
+							Description: "Stats shows statistics of individual hosts for this backup session",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("github.com/appscode/stash/apis/stash/v1beta1.BackupStats"),
+										Ref: ref("github.com/appscode/stash/apis/stash/v1beta1.HostBackupStats"),
 									},
 								},
 							},
@@ -745,61 +776,38 @@ func schema_stash_apis_stash_v1beta1_BackupSessionStatus(ref common.ReferenceCal
 			},
 		},
 		Dependencies: []string{
-			"github.com/appscode/go/encoding/json/types.IntHash", "github.com/appscode/stash/apis/stash/v1beta1.BackupStats"},
+			"github.com/appscode/go/encoding/json/types.IntHash", "github.com/appscode/stash/apis/stash/v1beta1.HostBackupStats"},
 	}
 }
 
-func schema_stash_apis_stash_v1beta1_BackupStats(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_stash_apis_stash_v1beta1_EmptyDirSettings(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Properties: map[string]spec.Schema{
-					"directory": {
+					"medium": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Directory indicates the directory that has been backed up in this session",
-							Type:        []string{"string"},
-							Format:      "",
+							Type:   []string{"string"},
+							Format: "",
 						},
 					},
-					"snapshot": {
+					"sizeLimit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Snapshot indicates the name of the backup snapshot created in this backup session",
-							Type:        []string{"string"},
-							Format:      "",
+							Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 						},
 					},
-					"size": {
+					"disableCaching": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Size indicates the size of target data to backup",
-							Type:        []string{"string"},
+							Description: "More info: https://github.com/restic/restic/blob/master/doc/manual_rest.rst#caching",
+							Type:        []string{"boolean"},
 							Format:      "",
-						},
-					},
-					"uploaded": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Uploaded indicates size of data uploaded to backend in this backup session",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"processingTime": {
-						SchemaProps: spec.SchemaProps{
-							Description: "ProcessingTime indicates time taken to process the target data",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"fileStats": {
-						SchemaProps: spec.SchemaProps{
-							Description: "FileStats shows statistics of files of backup session",
-							Ref:         ref("github.com/appscode/stash/apis/stash/v1beta1.FileStats"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/appscode/stash/apis/stash/v1beta1.FileStats"},
+			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
@@ -1099,11 +1107,112 @@ func schema_stash_apis_stash_v1beta1_FunctionSpec(ref common.ReferenceCallback) 
 							Ref:         ref("kmodules.xyz/offshoot-api/api/v1.ContainerRuntimeSettings"),
 						},
 					},
+					"podSecurityPolicyName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name of PodSecurityPolicy(PSP) required by this function",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
 			"k8s.io/api/core/v1.ContainerPort", "k8s.io/api/core/v1.EnvFromSource", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.VolumeDevice", "k8s.io/api/core/v1.VolumeMount", "kmodules.xyz/offshoot-api/api/v1.ContainerRuntimeSettings"},
+	}
+}
+
+func schema_stash_apis_stash_v1beta1_HostBackupStats(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"hostname": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Hostname indicate name of the host that has been backed up",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"phase": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Phase indicates backup phase of this host",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"snapshots": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Snapshots specifies the stats of individual snapshots that has been taken for this host in current backup session",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/appscode/stash/apis/stash/v1beta1.SnapshotStats"),
+									},
+								},
+							},
+						},
+					},
+					"duration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Duration indicates total time taken to complete backup for this hosts",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"error": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Error indicates string value of error in case of backup failure",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/appscode/stash/apis/stash/v1beta1.SnapshotStats"},
+	}
+}
+
+func schema_stash_apis_stash_v1beta1_HostRestoreStats(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"hostname": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Hostname indicate name of the host that has been restored",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"phase": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Phase indicates restore phase of this host",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"duration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Duration indicates total time taken to complete restore for this hosts",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"error": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Error indicates string value of error in case of restore failure",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{},
 	}
 }
 
@@ -1261,11 +1370,17 @@ func schema_stash_apis_stash_v1beta1_RestoreSessionSpec(ref common.ReferenceCall
 							Ref:         ref("kmodules.xyz/offshoot-api/api/v1.RuntimeSettings"),
 						},
 					},
+					"tempDir": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Temp directory configuration for functions/sidecar An `EmptyDir` will always be mounted at /tmp with this settings",
+							Ref:         ref("github.com/appscode/stash/apis/stash/v1beta1.EmptyDirSettings"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/appscode/stash/apis/stash/v1beta1.Rule", "github.com/appscode/stash/apis/stash/v1beta1.Target", "github.com/appscode/stash/apis/stash/v1beta1.TaskRef", "k8s.io/api/core/v1.LocalObjectReference", "kmodules.xyz/offshoot-api/api/v1.RuntimeSettings"},
+			"github.com/appscode/stash/apis/stash/v1beta1.EmptyDirSettings", "github.com/appscode/stash/apis/stash/v1beta1.Rule", "github.com/appscode/stash/apis/stash/v1beta1.Target", "github.com/appscode/stash/apis/stash/v1beta1.TaskRef", "k8s.io/api/core/v1.LocalObjectReference", "kmodules.xyz/offshoot-api/api/v1.RuntimeSettings"},
 	}
 }
 
@@ -1282,21 +1397,43 @@ func schema_stash_apis_stash_v1beta1_RestoreSessionStatus(ref common.ReferenceCa
 					},
 					"phase": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
+							Description: "Phase indicates the overall phase of the restore process for this RestoreSession. Phase will be \"Succeeded\" only if phase of all hosts are \"Succeeded\". If any of the host fail to complete restore, Phase will be \"Failed\".",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
-					"duration": {
+					"totalHosts": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
+							Description: "TotalHosts specifies total number of hosts that will be restored for this RestoreSession",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"sessionDuration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SessionDuration specify total time taken to complete current restore session (sum of restore duration of all hosts)",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"stats": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Stats shows statistics of individual hosts for this restore session",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/appscode/stash/apis/stash/v1beta1.HostRestoreStats"),
+									},
+								},
+							},
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/appscode/go/encoding/json/types.IntHash"},
+			"github.com/appscode/go/encoding/json/types.IntHash", "github.com/appscode/stash/apis/stash/v1beta1.HostRestoreStats"},
 	}
 }
 
@@ -1319,9 +1456,9 @@ func schema_stash_apis_stash_v1beta1_Rule(ref common.ReferenceCallback) common.O
 							},
 						},
 					},
-					"host": {
+					"sourceHost": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Host specifies the name of the host whose backed up state we are trying to restore By default, it will indicate the workload itself",
+							Description: "SourceHost specifies the name of the host whose backed up state we are trying to restore By default, it will indicate the workload itself",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1358,6 +1495,60 @@ func schema_stash_apis_stash_v1beta1_Rule(ref common.ReferenceCallback) common.O
 			},
 		},
 		Dependencies: []string{},
+	}
+}
+
+func schema_stash_apis_stash_v1beta1_SnapshotStats(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name indicates the name of the backup snapshot created for this host",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"directory": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Directory indicates the directory that has been backed up in this snapshot",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"size": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Size indicates the size of data to backup in target directory",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"uploaded": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Uploaded indicates size of data uploaded to backend for this snapshot",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"processingTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ProcessingTime indicates time taken to process the target data",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"fileStats": {
+						SchemaProps: spec.SchemaProps{
+							Description: "FileStats shows statistics of files of this snapshot",
+							Ref:         ref("github.com/appscode/stash/apis/stash/v1beta1.FileStats"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/appscode/stash/apis/stash/v1beta1.FileStats"},
 	}
 }
 
@@ -13219,6 +13410,12 @@ func schema_kmodulesxyz_objectstore_api_api_v1_AzureSpec(ref common.ReferenceCal
 							Format: "",
 						},
 					},
+					"maxConnections": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
 				},
 			},
 		},
@@ -13241,6 +13438,12 @@ func schema_kmodulesxyz_objectstore_api_api_v1_B2Spec(ref common.ReferenceCallba
 						SchemaProps: spec.SchemaProps{
 							Type:   []string{"string"},
 							Format: "",
+						},
+					},
+					"maxConnections": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
 						},
 					},
 				},
@@ -13291,11 +13494,16 @@ func schema_kmodulesxyz_objectstore_api_api_v1_Backend(ref common.ReferenceCallb
 							Ref: ref("kmodules.xyz/objectstore-api/api/v1.B2Spec"),
 						},
 					},
+					"rest": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("kmodules.xyz/objectstore-api/api/v1.RestServerSpec"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"kmodules.xyz/objectstore-api/api/v1.AzureSpec", "kmodules.xyz/objectstore-api/api/v1.B2Spec", "kmodules.xyz/objectstore-api/api/v1.GCSSpec", "kmodules.xyz/objectstore-api/api/v1.LocalSpec", "kmodules.xyz/objectstore-api/api/v1.S3Spec", "kmodules.xyz/objectstore-api/api/v1.SwiftSpec"},
+			"kmodules.xyz/objectstore-api/api/v1.AzureSpec", "kmodules.xyz/objectstore-api/api/v1.B2Spec", "kmodules.xyz/objectstore-api/api/v1.GCSSpec", "kmodules.xyz/objectstore-api/api/v1.LocalSpec", "kmodules.xyz/objectstore-api/api/v1.RestServerSpec", "kmodules.xyz/objectstore-api/api/v1.S3Spec", "kmodules.xyz/objectstore-api/api/v1.SwiftSpec"},
 	}
 }
 
@@ -13314,6 +13522,12 @@ func schema_kmodulesxyz_objectstore_api_api_v1_GCSSpec(ref common.ReferenceCallb
 						SchemaProps: spec.SchemaProps{
 							Type:   []string{"string"},
 							Format: "",
+						},
+					},
+					"maxConnections": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
 						},
 					},
 				},
@@ -13617,11 +13831,67 @@ func schema_kmodulesxyz_offshoot_api_api_v1_ContainerRuntimeSettings(ref common.
 							Ref:         ref("k8s.io/api/core/v1.SecurityContext"),
 						},
 					},
+					"nice": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Settings to configure `nice` to throttle the load on cpu. More info: http://kennystechtalk.blogspot.com/2015/04/throttling-cpu-usage-with-linux-cgroups.html More info: https://oakbytes.wordpress.com/2012/06/06/linux-scheduler-cfs-and-nice/",
+							Ref:         ref("kmodules.xyz/offshoot-api/api/v1.NiceSettings"),
+						},
+					},
+					"ionice": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Settings to configure `ionice` to throttle the load on disk. More info: http://kennystechtalk.blogspot.com/2015/04/throttling-cpu-usage-with-linux-cgroups.html More info: https://oakbytes.wordpress.com/2012/06/06/linux-scheduler-cfs-and-nice/",
+							Ref:         ref("kmodules.xyz/offshoot-api/api/v1.IONiceSettings"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.Lifecycle", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements", "k8s.io/api/core/v1.SecurityContext"},
+			"k8s.io/api/core/v1.Lifecycle", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements", "k8s.io/api/core/v1.SecurityContext", "kmodules.xyz/offshoot-api/api/v1.IONiceSettings", "kmodules.xyz/offshoot-api/api/v1.NiceSettings"},
+	}
+}
+
+func schema_kmodulesxyz_offshoot_api_api_v1_IONiceSettings(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "https://linux.die.net/man/1/ionice",
+				Properties: map[string]spec.Schema{
+					"class": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+					"classData": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{},
+	}
+}
+
+func schema_kmodulesxyz_offshoot_api_api_v1_NiceSettings(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "https://linux.die.net/man/1/nice",
+				Properties: map[string]spec.Schema{
+					"adjustment": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{},
 	}
 }
 
@@ -13791,6 +14061,13 @@ func schema_kmodulesxyz_offshoot_api_api_v1_PodSpec(ref common.ReferenceCallback
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Properties: map[string]spec.Schema{
+					"serviceAccountName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ServiceAccountName is the name of the ServiceAccount to use to run this pod. More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"args": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Arguments to the entrypoint. The docker image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell",

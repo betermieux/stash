@@ -5,7 +5,9 @@ import (
 
 	"github.com/appscode/go/flags"
 	"github.com/appscode/go/log"
+	api_v1beta1 "github.com/appscode/stash/apis/stash/v1beta1"
 	"github.com/appscode/stash/pkg/restic"
+	"github.com/appscode/stash/pkg/util"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/errors"
 )
@@ -17,8 +19,10 @@ const (
 func NewCmdBackupPVC() *cobra.Command {
 	var (
 		outputDir string
-		backupOpt restic.BackupOptions
-		setupOpt  = restic.SetupOptions{
+		backupOpt = restic.BackupOptions{
+			Host: restic.DefaultHost,
+		}
+		setupOpt = restic.SetupOptions{
 			ScratchDir:  restic.DefaultScratchDir,
 			EnableCache: false,
 		}
@@ -33,6 +37,17 @@ func NewCmdBackupPVC() *cobra.Command {
 		DisableAutoGenTag: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			flags.EnsureRequiredFlags(cmd, "backup-dirs", "provider", "secret-dir")
+
+			// apply nice, ionice settings from env
+			var err error
+			setupOpt.Nice, err = util.NiceSettingsFromEnv()
+			if err != nil {
+				return handleResticError(outputDir, restic.DefaultOutputFileName, err)
+			}
+			setupOpt.IONice, err = util.IONiceSettingsFromEnv()
+			if err != nil {
+				return handleResticError(outputDir, restic.DefaultOutputFileName, err)
+			}
 
 			// init restic wrapper
 			resticWrapper, err := restic.NewResticWrapper(setupOpt)
@@ -62,10 +77,12 @@ func NewCmdBackupPVC() *cobra.Command {
 	cmd.Flags().StringVar(&setupOpt.Provider, "provider", setupOpt.Provider, "Backend provider (i.e. gcs, s3, azure etc)")
 	cmd.Flags().StringVar(&setupOpt.Bucket, "bucket", setupOpt.Bucket, "Name of the cloud bucket/container (keep empty for local backend)")
 	cmd.Flags().StringVar(&setupOpt.Endpoint, "endpoint", setupOpt.Endpoint, "Endpoint for s3/s3 compatible backend")
+	cmd.Flags().StringVar(&setupOpt.URL, "rest-server-url", setupOpt.URL, "URL for rest backend")
 	cmd.Flags().StringVar(&setupOpt.Path, "path", setupOpt.Path, "Directory inside the bucket where backup will be stored")
 	cmd.Flags().StringVar(&setupOpt.SecretDir, "secret-dir", setupOpt.SecretDir, "Directory where storage secret has been mounted")
 	cmd.Flags().StringVar(&setupOpt.ScratchDir, "scratch-dir", setupOpt.ScratchDir, "Temporary directory")
 	cmd.Flags().BoolVar(&setupOpt.EnableCache, "enable-cache", setupOpt.EnableCache, "Specify weather to enable caching for restic")
+	cmd.Flags().IntVar(&setupOpt.MaxConnections, "max-connections", setupOpt.MaxConnections, "Specify maximum concurrent connections for GCS, Azure and B2 backend")
 
 	cmd.Flags().StringVar(&backupOpt.Host, "hostname", backupOpt.Host, "Name of the host machine")
 	cmd.Flags().StringSliceVar(&backupOpt.BackupDirs, "backup-dirs", backupOpt.BackupDirs, "List of directories to be backed up")
@@ -96,6 +113,9 @@ func handleResticError(outputDir, fileName string, backupErr error) error {
 		return backupErr
 	}
 	log.Infoln("Writing restic error to output file, error:", backupErr.Error())
-	backupOut := restic.BackupOutput{Error: backupErr.Error()}
+	backupOut := restic.BackupOutput{
+		HostBackupStats: api_v1beta1.HostBackupStats{
+			Error: backupErr.Error(),
+		}}
 	return backupOut.WriteOutput(filepath.Join(outputDir, fileName))
 }

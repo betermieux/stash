@@ -8,26 +8,12 @@ import (
 	apiAlpha "github.com/appscode/stash/apis/stash/v1alpha1"
 	api "github.com/appscode/stash/apis/stash/v1beta1"
 	"github.com/appscode/stash/pkg/util"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	core_util "kmodules.xyz/client-go/core/v1"
 )
 
 func (c *StashController) inputsForBackupConfig(backupConfig api.BackupConfiguration) (map[string]string, error) {
-	// get repository for backupConfig
-	repository, err := c.stashClient.StashV1alpha1().Repositories(backupConfig.Namespace).Get(
-		backupConfig.Spec.Repository.Name,
-		metav1.GetOptions{},
-	)
-	if err != nil {
-		return nil, err
-	}
-	// get inputs for repository
-	inputs, err := c.inputsForRepository(repository)
-	if err != nil {
-		return nil, err
-	}
-	// append inputs for target
-	inputs = core_util.UpsertMap(inputs, c.inputsForTarget(backupConfig.Spec.Target))
+	// get inputs for target
+	inputs := c.inputsForTarget(backupConfig.Spec.Target)
 	// append inputs for RetentionPolicy
 	inputs = core_util.UpsertMap(inputs, c.inputsForRetentionPolicy(backupConfig.Spec.RetentionPolicy))
 
@@ -38,25 +24,15 @@ func (c *StashController) inputsForBackupConfig(backupConfig api.BackupConfigura
 	}
 	inputs[apis.Hostname] = host
 
+	// always enable cache if nothing specified
+	inputs[apis.EnableCache] = strconv.FormatBool(!backupConfig.Spec.TempDir.DisableCaching)
+
 	return inputs, nil
 }
 
 func (c *StashController) inputsForRestoreSession(restoreSession api.RestoreSession) (map[string]string, error) {
-	// get repository for restoreSession
-	repository, err := c.stashClient.StashV1alpha1().Repositories(restoreSession.Namespace).Get(
-		restoreSession.Spec.Repository.Name,
-		metav1.GetOptions{},
-	)
-	if err != nil {
-		return nil, err
-	}
-	// get inputs for repository
-	inputs, err := c.inputsForRepository(repository)
-	if err != nil {
-		return nil, err
-	}
-	// append inputs for target
-	inputs = core_util.UpsertMap(inputs, c.inputsForTarget(restoreSession.Spec.Target))
+	// get inputs for target
+	inputs := c.inputsForTarget(restoreSession.Spec.Target)
 
 	// get host name for target
 	host, err := util.GetHostName(restoreSession.Spec.Target)
@@ -65,9 +41,12 @@ func (c *StashController) inputsForRestoreSession(restoreSession api.RestoreSess
 	}
 	// append inputs from RestoreOptions
 	restoreOptions := util.RestoreOptionsForHost(host, restoreSession.Spec.Rules)
-	inputs[apis.Hostname] = restoreOptions.Host
+	inputs[apis.Hostname] = restoreOptions.SourceHost
 	inputs[apis.RestoreDirectories] = strings.Join(restoreOptions.RestoreDirs, ",")
 	inputs[apis.RestoreSnapshots] = strings.Join(restoreOptions.Snapshots, ",")
+
+	// always enable cache if nothing specified
+	inputs[apis.EnableCache] = strconv.FormatBool(!restoreSession.Spec.TempDir.DisableCaching)
 
 	return inputs, nil
 }
@@ -92,6 +71,10 @@ func (c *StashController) inputsForRepository(repository *apiAlpha.Repository) (
 	if repository.Spec.Backend.S3 != nil && repository.Spec.Backend.S3.Endpoint != "" {
 		inputs[apis.RepositoryEndpoint] = repository.Spec.Backend.S3.Endpoint
 	}
+	if repository.Spec.Backend.Rest != nil && repository.Spec.Backend.Rest.URL != "" {
+		inputs[apis.RepositoryURL] = repository.Spec.Backend.Rest.URL
+	}
+	inputs[apis.MaxConnections] = strconv.Itoa(util.GetMaxConnections(repository.Spec.Backend))
 	return
 }
 

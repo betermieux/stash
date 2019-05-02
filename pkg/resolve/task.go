@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/appscode/stash/apis"
+	v1beta1_api "github.com/appscode/stash/apis/stash/v1beta1"
 	cs "github.com/appscode/stash/client/clientset/versioned"
+	"github.com/appscode/stash/pkg/util"
 	"gomodules.xyz/envsubst"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,6 +21,7 @@ type TaskResolver struct {
 	TaskName        string
 	Inputs          map[string]string
 	RuntimeSettings ofst.RuntimeSettings
+	TempDir         v1beta1_api.EmptyDirSettings
 }
 
 func (o TaskResolver) GetPodSpec() (core.PodSpec, error) {
@@ -74,8 +78,11 @@ func (o TaskResolver) GetPodSpec() (core.PodSpec, error) {
 			ReadinessProbe:  function.Spec.RuntimeSettings.ReadinessProbe,
 			Lifecycle:       function.Spec.RuntimeSettings.Lifecycle,
 			SecurityContext: function.Spec.RuntimeSettings.SecurityContext,
-			ImagePullPolicy: core.PullAlways, // TODO
+			ImagePullPolicy: core.PullIfNotPresent,
 		}
+
+		// mount tmp volume
+		container.VolumeMounts = util.UpsertTmpVolumeMount(container.VolumeMounts)
 
 		// apply RuntimeSettings to Container
 		if o.RuntimeSettings.Container != nil {
@@ -98,6 +105,8 @@ func (o TaskResolver) GetPodSpec() (core.PodSpec, error) {
 	if o.RuntimeSettings.Pod != nil {
 		podSpec = applyPodRuntimeSettings(podSpec, *o.RuntimeSettings.Pod)
 	}
+	// always upsert tmp volume
+	podSpec.Volumes = util.UpsertTmpVolume(podSpec.Volumes, o.TempDir)
 	return podSpec, nil
 }
 
@@ -120,6 +129,27 @@ func applyContainerRuntimeSettings(container core.Container, settings ofst.Conta
 	}
 	if settings.SecurityContext != nil {
 		container.SecurityContext = settings.SecurityContext
+	}
+	// set nice, ionice settings as env
+	if settings.Nice != nil && settings.Nice.Adjustment != nil {
+		container.Env = core_util.UpsertEnvVars(container.Env, core.EnvVar{
+			Name:  apis.NiceAdjustment,
+			Value: fmt.Sprint(*settings.Nice.Adjustment),
+		})
+	}
+	if settings.IONice != nil {
+		if settings.IONice.Class != nil {
+			container.Env = core_util.UpsertEnvVars(container.Env, core.EnvVar{
+				Name:  apis.IONiceClass,
+				Value: fmt.Sprint(*settings.IONice.Class),
+			})
+		}
+		if settings.IONice.ClassData != nil {
+			container.Env = core_util.UpsertEnvVars(container.Env, core.EnvVar{
+				Name:  apis.IONiceClassData,
+				Value: fmt.Sprint(*settings.IONice.ClassData),
+			})
+		}
 	}
 	return container
 }
@@ -183,6 +213,7 @@ func resolveWithInputs(obj interface{}, inputs map[string]string) error {
 	}
 	return json.Unmarshal([]byte(resolved), obj)
 }
+
 func ResolveBackend(backend *store.Backend, input map[string]string) error {
 	return resolveWithInputs(backend, input)
 }

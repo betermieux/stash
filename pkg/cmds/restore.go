@@ -19,7 +19,7 @@ func NewCmdRestore() *cobra.Command {
 		Namespace:      meta.Namespace(),
 		SetupOpt: restic.SetupOptions{
 			ScratchDir:  "/tmp",
-			EnableCache: false,
+			EnableCache: true,
 		},
 	}
 
@@ -46,6 +46,7 @@ func NewCmdRestore() *cobra.Command {
 				if e2 != nil {
 					err = errors.NewAggregate([]error{err, e2})
 				}
+				// fail this container so that it restart and re-try to restore
 				log.Fatalln(err)
 			}
 			return nil
@@ -56,6 +57,7 @@ func NewCmdRestore() *cobra.Command {
 	cmd.Flags().StringVar(&opt.RestoreSessionName, "restore-session", opt.RestoreSessionName, "Name of the RestoreSession CRD.")
 	cmd.Flags().DurationVar(&opt.BackoffMaxWait, "backoff-max-wait", 0, "Maximum wait for initial response from kube apiserver; 0 disables the timeout")
 	cmd.Flags().BoolVar(&opt.SetupOpt.EnableCache, "enable-cache", opt.SetupOpt.EnableCache, "Specify weather to enable caching for restic")
+	cmd.Flags().IntVar(&opt.SetupOpt.MaxConnections, "max-connections", opt.SetupOpt.MaxConnections, "Specify maximum concurrent connections for GCS, Azure and B2 backend")
 	cmd.Flags().StringVar(&opt.SetupOpt.SecretDir, "secret-dir", opt.SetupOpt.SecretDir, "Directory where storage secret has been mounted")
 
 	cmd.Flags().BoolVar(&opt.Metrics.Enabled, "metrics-enabled", opt.Metrics.Enabled, "Specify weather to export Prometheus metrics")

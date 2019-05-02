@@ -3,9 +3,10 @@ package controller
 import (
 	"fmt"
 
+	"github.com/appscode/go/log"
 	api_v1beta1 "github.com/appscode/stash/apis/stash/v1beta1"
 	stash_scheme "github.com/appscode/stash/client/clientset/versioned/scheme"
-	stash_v1beta1_util "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1beta1/util"
+	v1beta1_util "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1beta1/util"
 	"github.com/appscode/stash/pkg/docker"
 	"github.com/appscode/stash/pkg/util"
 	"github.com/golang/glog"
@@ -55,7 +56,7 @@ func (c *StashController) runBackupConfigurationProcessor(key string) error {
 					return err
 				}
 				// Remove finalizer
-				_, _, err = stash_v1beta1_util.PatchBackupConfiguration(c.stashClient.StashV1beta1(), backupConfiguration, func(in *api_v1beta1.BackupConfiguration) *api_v1beta1.BackupConfiguration {
+				_, _, err = v1beta1_util.PatchBackupConfiguration(c.stashClient.StashV1beta1(), backupConfiguration, func(in *api_v1beta1.BackupConfiguration) *api_v1beta1.BackupConfiguration {
 					in.ObjectMeta = core_util.RemoveFinalizer(in.ObjectMeta, api_v1beta1.StashKey)
 					return in
 
@@ -66,12 +67,18 @@ func (c *StashController) runBackupConfigurationProcessor(key string) error {
 			}
 		} else {
 			// add a finalizer so that we can remove respective resources before this BackupConfiguration is deleted
-			_, _, err := stash_v1beta1_util.PatchBackupConfiguration(c.stashClient.StashV1beta1(), backupConfiguration, func(in *api_v1beta1.BackupConfiguration) *api_v1beta1.BackupConfiguration {
+			_, _, err := v1beta1_util.PatchBackupConfiguration(c.stashClient.StashV1beta1(), backupConfiguration, func(in *api_v1beta1.BackupConfiguration) *api_v1beta1.BackupConfiguration {
 				in.ObjectMeta = core_util.AddFinalizer(in.ObjectMeta, api_v1beta1.StashKey)
 				return in
 			})
 			if err != nil {
 				return err
+			}
+
+			// skip if BackupConfiguration paused
+			if backupConfiguration.Spec.Paused {
+				log.Infof("Skipping processing BackupConfiguration %s/%s. Reason: Backup Configuration is paused.", backupConfiguration.Namespace, backupConfiguration.Name)
+				return nil
 			}
 
 			if backupConfiguration.Spec.Target != nil &&
@@ -159,6 +166,16 @@ func (c *StashController) sendEventToWorkloadQueue(kind, namespace, resourceName
 			}
 			return err
 		}
+	case workload_api.KindDeploymentConfig:
+		if c.ocClient != nil && c.dcLister != nil {
+			if resource, err := c.dcLister.DeploymentConfigs(namespace).Get(resourceName); err == nil {
+				key, err := cache.MetaNamespaceKeyFunc(resource)
+				if err == nil {
+					c.dcQueue.GetQueue().Add(key)
+				}
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -232,7 +249,7 @@ func (c *StashController) EnsureCronJob(backupConfiguration *api_v1beta1.BackupC
 				ImagePullPolicy: core.PullIfNotPresent,
 				Image:           image.ToContainerImage(),
 				Args: []string{
-					"backup-session",
+					"create-backupsession",
 					fmt.Sprintf("--backupsession.name=%s", backupConfiguration.Name),
 					fmt.Sprintf("--backupsession.namespace=%s", backupConfiguration.Namespace),
 				},

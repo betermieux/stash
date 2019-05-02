@@ -10,7 +10,7 @@ webhooks:
     service:
       namespace: default
       name: kubernetes
-      path: /apis/admission.stash.appscode.com/v1alpha1/deployments
+      path: /apis/admission.stash.appscode.com/v1alpha1/deploymentmutators
     caBundle: ${KUBE_CA}
   rules:
   - operations:
@@ -23,14 +23,14 @@ webhooks:
     - "*"
     resources:
     - deployments
-  failurePolicy: Fail
+  failurePolicy: Ignore
   ${STASH_WEBHOOK_SIDE_EFFECTS}
 - name: daemonset.admission.stash.appscode.com
   clientConfig:
     service:
       namespace: default
       name: kubernetes
-      path: /apis/admission.stash.appscode.com/v1alpha1/daemonsets
+      path: /apis/admission.stash.appscode.com/v1alpha1/daemonsetmutators
     caBundle: ${KUBE_CA}
   rules:
   - operations:
@@ -43,14 +43,14 @@ webhooks:
     - "*"
     resources:
     - daemonsets
-  failurePolicy: Fail
+  failurePolicy: Ignore
   ${STASH_WEBHOOK_SIDE_EFFECTS}
 - name: statefulset.admission.stash.appscode.com
   clientConfig:
     service:
       namespace: default
       name: kubernetes
-      path: /apis/admission.stash.appscode.com/v1alpha1/statefulsets
+      path: /apis/admission.stash.appscode.com/v1alpha1/statefulsetmutators
     caBundle: ${KUBE_CA}
   rules:
   - operations:
@@ -61,14 +61,14 @@ webhooks:
     - "*"
     resources:
     - statefulsets
-  failurePolicy: Fail
+  failurePolicy: Ignore
   ${STASH_WEBHOOK_SIDE_EFFECTS}
 - name: replicationcontroller.admission.stash.appscode.com
   clientConfig:
     service:
       namespace: default
       name: kubernetes
-      path: /apis/admission.stash.appscode.com/v1alpha1/replicationcontrollers
+      path: /apis/admission.stash.appscode.com/v1alpha1/replicationcontrollermutators
     caBundle: ${KUBE_CA}
   rules:
   - operations:
@@ -80,14 +80,14 @@ webhooks:
     - "*"
     resources:
     - replicationcontrollers
-  failurePolicy: Fail
+  failurePolicy: Ignore
   ${STASH_WEBHOOK_SIDE_EFFECTS}
 - name: replicaset.admission.stash.appscode.com
   clientConfig:
     service:
       namespace: default
       name: kubernetes
-      path: /apis/admission.stash.appscode.com/v1alpha1/replicasets
+      path: /apis/admission.stash.appscode.com/v1alpha1/replicasetmutators
     caBundle: ${KUBE_CA}
   rules:
   - operations:
@@ -100,5 +100,24 @@ webhooks:
     - "*"
     resources:
     - replicasets
-  failurePolicy: Fail
+  failurePolicy: Ignore
+  ${STASH_WEBHOOK_SIDE_EFFECTS}
+- name: deploymentconfig.admission.stash.appscode.com
+  clientConfig:
+    service:
+      namespace: default
+      name: kubernetes
+      path: /apis/admission.stash.appscode.com/v1alpha1/deploymentconfigmutators
+    caBundle: ${KUBE_CA}
+  rules:
+  - operations:
+    - CREATE
+    - UPDATE
+    apiGroups:
+    - apps.openshift.io
+    apiVersions:
+    - "*"
+    resources:
+    - deploymentconfigs
+  failurePolicy: Ignore
   ${STASH_WEBHOOK_SIDE_EFFECTS}

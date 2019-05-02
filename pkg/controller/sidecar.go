@@ -193,7 +193,7 @@ func (c *StashController) ensureBackupSidecar(w *wapi.Workload, bc *api_v1beta1.
 		)
 	}
 
-	w.Spec.Template.Spec.Volumes = util.UpsertScratchVolume(w.Spec.Template.Spec.Volumes)
+	w.Spec.Template.Spec.Volumes = util.UpsertTmpVolume(w.Spec.Template.Spec.Volumes, bc.Spec.TempDir)
 	w.Spec.Template.Spec.Volumes = util.UpsertDownwardVolume(w.Spec.Template.Spec.Volumes)
 	w.Spec.Template.Spec.Volumes = util.UpsertSecretVolume(w.Spec.Template.Spec.Volumes, repository.Spec.Backend.StorageSecretName)
 	// if Repository uses local volume as backend, append this volume to workload.
@@ -250,7 +250,7 @@ func (c *StashController) ensureBackupSidecarDeleted(w *wapi.Workload, bc *api_v
 func (c *StashController) ensureWorkloadLatestState(w *wapi.Workload) (bool, error) {
 	stateChanged := false
 
-	err := wait.PollImmediateInfinite(3*time.Second, func() (done bool, err error) {
+	err := wait.PollImmediate(3*time.Second, 5*time.Minute, func() (done bool, err error) {
 		r, err := metav1.LabelSelectorAsSelector(w.Spec.Selector)
 		if err != nil {
 			return false, err
@@ -274,6 +274,9 @@ func (c *StashController) ensureWorkloadLatestState(w *wapi.Workload) (bool, err
 		// we have to restart these pods so that it starts with latest update
 		var podsToRestart []core.Pod
 		for _, pod := range pods.Items {
+			if !isPodOwnedByWorkload(w, pod) {
+				continue
+			}
 			podSidecarState := hasStashSidecar(pod.Spec.Containers)
 			podInitContainerState := hasStashInitContainer(pod.Spec.InitContainers)
 			podBackupResourceHash := util.GetString(pod.Annotations, api_v1beta1.AppliedBackupConfigurationSpecHash)
@@ -304,4 +307,13 @@ func (c *StashController) ensureWorkloadLatestState(w *wapi.Workload) (bool, err
 	}
 
 	return stateChanged, nil
+}
+
+func isPodOwnedByWorkload(w *wapi.Workload, pod core.Pod) bool {
+	for _, ref := range pod.OwnerReferences {
+		if ref.Kind == w.Kind && ref.Name == w.Name {
+			return true
+		}
+	}
+	return false
 }

@@ -1,6 +1,10 @@
 package restic
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -8,11 +12,13 @@ import (
 
 	"github.com/appscode/go/log"
 	"github.com/appscode/stash/apis/stash/v1alpha1"
-	"github.com/pkg/errors"
+	"github.com/armon/circbuf"
 )
 
 const (
-	Exe = "/bin/restic_0.9.4"
+	ResticCMD = "/bin/restic_0.9.4"
+	IONiceCMD = "/bin/ionice"
+	NiceCMD   = "/bin/nice"
 )
 
 type Snapshot struct {
@@ -31,33 +37,40 @@ func (w *ResticWrapper) listSnapshots(snapshotIDs []string) ([]Snapshot, error) 
 	result := make([]Snapshot, 0)
 	args := w.appendCacheDirFlag([]interface{}{"snapshots", "--json", "--quiet", "--no-lock"})
 	args = w.appendCaCertFlag(args)
+	args = w.appendMaxConnectionsFlag(args)
 	for _, id := range snapshotIDs {
 		args = append(args, id)
 	}
-
-	err := w.sh.Command(Exe, args...).UnmarshalJSON(&result)
+	out, err := w.run(Command{Name: ResticCMD, Args: args})
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(out, &result)
 	return result, err
 }
 
 func (w *ResticWrapper) deleteSnapshots(snapshotIDs []string) ([]byte, error) {
 	args := w.appendCacheDirFlag([]interface{}{"forget", "--quiet", "--prune"})
 	args = w.appendCaCertFlag(args)
+	args = w.appendMaxConnectionsFlag(args)
 	for _, id := range snapshotIDs {
 		args = append(args, id)
 	}
 
-	return w.run(Exe, args)
+	return w.run(Command{Name: ResticCMD, Args: args})
 }
 
 func (w *ResticWrapper) initRepositoryIfAbsent() ([]byte, error) {
 	log.Infoln("Ensuring restic repository in the backend")
 	args := w.appendCacheDirFlag([]interface{}{"snapshots", "--json"})
 	args = w.appendCaCertFlag(args)
-	if _, err := w.run(Exe, args); err != nil {
+	args = w.appendMaxConnectionsFlag(args)
+	if _, err := w.run(Command{Name: ResticCMD, Args: args}); err != nil {
 		args = w.appendCacheDirFlag([]interface{}{"init"})
 		args = w.appendCaCertFlag(args)
+		args = w.appendMaxConnectionsFlag(args)
 
-		return w.run(Exe, args)
+		return w.run(Command{Name: ResticCMD, Args: args})
 	}
 	return nil, nil
 }
@@ -75,9 +88,38 @@ func (w *ResticWrapper) backup(path, host string, tags []string) ([]byte, error)
 		args = append(args, tag)
 	}
 	args = w.appendCacheDirFlag(args)
+	args = w.appendCleanupCacheFlag(args)
 	args = w.appendCaCertFlag(args)
+	args = w.appendMaxConnectionsFlag(args)
 
-	return w.run(Exe, args)
+	return w.run(Command{Name: ResticCMD, Args: args})
+}
+
+func (w *ResticWrapper) backupFromStdin(options BackupOptions) ([]byte, error) {
+	log.Infoln("Backing up stdin data")
+
+	// first add StdinPipeCommand, then add restic command
+	var commands []Command
+	if options.StdinPipeCommand.Name != "" {
+		commands = append(commands, options.StdinPipeCommand)
+	}
+
+	args := []interface{}{"backup", "--stdin"}
+	if options.StdinFileName != "" {
+		args = append(args, "--stdin-filename")
+		args = append(args, options.StdinFileName)
+	}
+	if options.Host != "" {
+		args = append(args, "--host")
+		args = append(args, options.Host)
+	}
+	args = w.appendCacheDirFlag(args)
+	args = w.appendCleanupCacheFlag(args)
+	args = w.appendCaCertFlag(args)
+	args = w.appendMaxConnectionsFlag(args)
+
+	commands = append(commands, Command{Name: ResticCMD, Args: args})
+	return w.run(commands...)
 }
 
 func (w *ResticWrapper) cleanup(retentionPolicy v1alpha1.RetentionPolicy) ([]byte, error) {
@@ -123,59 +165,139 @@ func (w *ResticWrapper) cleanup(retentionPolicy v1alpha1.RetentionPolicy) ([]byt
 	if len(args) > 1 {
 		args = w.appendCacheDirFlag(args)
 		args = w.appendCaCertFlag(args)
+		args = w.appendMaxConnectionsFlag(args)
 
-		return w.run(Exe, args)
+		return w.run(Command{Name: ResticCMD, Args: args})
 	}
 	return nil, nil
 }
 
-func (w *ResticWrapper) restore(path, host, snapshotID string) ([]byte, error) {
+func (w *ResticWrapper) restore(path, host, snapshotID, destination string) ([]byte, error) {
 	log.Infoln("Restoring backed up data")
+
 	args := []interface{}{"restore"}
 	if snapshotID != "" {
 		args = append(args, snapshotID)
 	} else {
 		args = append(args, "latest")
 	}
-	args = append(args, "--path")
-	args = append(args, path) // source-path specified in restic fileGroup
-	args = append(args, "--host")
-	args = append(args, host)
+	if path != "" {
+		args = append(args, "--path")
+		args = append(args, path) // source-path specified in restic fileGroup
+	}
+	if host != "" {
+		args = append(args, "--host")
+		args = append(args, host)
+	}
 
-	// Remove last part from the path.
-	// https://github.com/appscode/stash/issues/392
-	args = append(args, "--target", "/")
-	// args = append(args, filepath.Dir(path))
+	if destination == "" {
+		destination = "/" // restore in absolute path
+	}
+	args = append(args, "--target", destination)
 
 	args = w.appendCacheDirFlag(args)
 	args = w.appendCaCertFlag(args)
+	args = w.appendMaxConnectionsFlag(args)
 
-	return w.run(Exe, args)
+	return w.run(Command{Name: ResticCMD, Args: args})
+}
+
+func (w *ResticWrapper) dump(dumpOptions DumpOptions) ([]byte, error) {
+	log.Infoln("Dumping backed up data")
+
+	args := []interface{}{"dump", "--quiet"}
+	if dumpOptions.Snapshot != "" {
+		args = append(args, dumpOptions.Snapshot)
+	} else {
+		args = append(args, "latest")
+	}
+	if dumpOptions.FileName != "" {
+		args = append(args, dumpOptions.FileName)
+	} else {
+		args = append(args, "stdin")
+	}
+	if dumpOptions.Host != "" {
+		args = append(args, "--host")
+		args = append(args, dumpOptions.Host)
+	}
+	if dumpOptions.Path != "" {
+		args = append(args, "--path")
+		args = append(args, dumpOptions.Path)
+	}
+
+	args = w.appendCacheDirFlag(args)
+	args = w.appendCaCertFlag(args)
+	args = w.appendMaxConnectionsFlag(args)
+
+	// first add restic command, then add StdoutPipeCommand
+	commands := []Command{
+		{Name: ResticCMD, Args: args},
+	}
+	if dumpOptions.StdoutPipeCommand.Name != "" {
+		commands = append(commands, dumpOptions.StdoutPipeCommand)
+	}
+	return w.run(commands...)
 }
 
 func (w *ResticWrapper) check() ([]byte, error) {
 	log.Infoln("Checking integrity of repository")
 	args := w.appendCacheDirFlag([]interface{}{"check"})
 	args = w.appendCaCertFlag(args)
+	args = w.appendMaxConnectionsFlag(args)
 
-	return w.run(Exe, args)
+	return w.run(Command{Name: ResticCMD, Args: args})
 }
 
 func (w *ResticWrapper) stats() ([]byte, error) {
 	log.Infoln("Reading repository status")
 	args := w.appendCacheDirFlag([]interface{}{"stats"})
+	args = w.appendMaxConnectionsFlag(args)
 	args = append(args, "--mode=raw-data", "--quiet")
 	args = w.appendCaCertFlag(args)
 
-	return w.run(Exe, args)
+	return w.run(Command{Name: ResticCMD, Args: args})
+}
+
+func (w *ResticWrapper) unlock() ([]byte, error) {
+	log.Infoln("Unlocking restic repository")
+	args := w.appendCacheDirFlag([]interface{}{"unlock", "--remove-all"})
+	args = w.appendMaxConnectionsFlag(args)
+	args = w.appendCaCertFlag(args)
+
+	return w.run(Command{Name: ResticCMD, Args: args})
 }
 
 func (w *ResticWrapper) appendCacheDirFlag(args []interface{}) []interface{} {
 	if w.config.EnableCache {
-		cacheDir := filepath.Join(w.config.ScratchDir, "restic-cache")
+		cacheDir := filepath.Join(w.config.ScratchDir, resticCacheDir)
 		return append(args, "--cache-dir", cacheDir)
 	}
 	return append(args, "--no-cache")
+}
+
+func (w *ResticWrapper) appendMaxConnectionsFlag(args []interface{}) []interface{} {
+	var maxConOption string
+	if w.config.MaxConnections > 0 {
+		switch w.config.Provider {
+		case ProviderGCS:
+			maxConOption = fmt.Sprintf("gs.connections=%d", w.config.MaxConnections)
+		case ProviderAzure:
+			maxConOption = fmt.Sprintf("azure.connections=%d", w.config.MaxConnections)
+		case ProviderB2:
+			maxConOption = fmt.Sprintf("b2.connections=%d", w.config.MaxConnections)
+		}
+	}
+	if maxConOption != "" {
+		return append(args, "--option", maxConOption)
+	}
+	return args
+}
+
+func (w *ResticWrapper) appendCleanupCacheFlag(args []interface{}) []interface{} {
+	if w.config.EnableCache {
+		return append(args, "--cleanup-cache")
+	}
+	return args
 }
 
 func (w *ResticWrapper) appendCaCertFlag(args []interface{}) []interface{} {
@@ -185,15 +307,73 @@ func (w *ResticWrapper) appendCaCertFlag(args []interface{}) []interface{} {
 	return args
 }
 
-func (w *ResticWrapper) run(cmd string, args []interface{}) ([]byte, error) {
-	out, err := w.sh.Command(cmd, args...).Output()
+func (w *ResticWrapper) run(commands ...Command) ([]byte, error) {
+	// write std errors into os.Stderr and buffer
+	errBuff, err := circbuf.NewBuffer(256)
 	if err != nil {
-		log.Errorf("Error running command '%s %s' output:\n%s", cmd, args, string(out))
-		parts := strings.Split(strings.TrimSuffix(string(out), "\n"), "\n")
-		if len(parts) > 1 {
-			parts = parts[len(parts)-1:]
-			return nil, errors.New(parts[0])
-		}
+		return nil, err
 	}
-	return out, err
+	w.sh.Stderr = io.MultiWriter(os.Stderr, errBuff)
+
+	for _, cmd := range commands {
+		if cmd.Name == ResticCMD {
+			// first apply NiceSettings, then apply IONiceSettings
+			cmd = w.applyIONiceSettings(w.applyNiceSettings(cmd))
+		}
+		w.sh.Command(cmd.Name, cmd.Args...)
+	}
+	out, err := w.sh.Output()
+	if err != nil {
+		return nil, formatError(err, errBuff.String())
+	}
+	log.Infoln("sh-output:", string(out))
+	return out, nil
+}
+
+// return last line of std error as error reason
+func formatError(err error, stdErr string) error {
+	parts := strings.Split(strings.TrimSuffix(stdErr, "\n"), "\n")
+	if len(parts) > 1 {
+		return fmt.Errorf("%s, reason: %s", err, parts[len(parts)-1:][0])
+	}
+	return err
+}
+
+func (w *ResticWrapper) applyIONiceSettings(oldCommand Command) Command {
+	if w.config.IONice == nil {
+		return oldCommand
+	}
+	newCommand := Command{
+		Name: IONiceCMD,
+	}
+	if w.config.IONice.Class != nil {
+		newCommand.Args = append(newCommand.Args, "-c", fmt.Sprint(*w.config.IONice.Class))
+	}
+	if w.config.IONice.ClassData != nil {
+		newCommand.Args = append(newCommand.Args, "-n", fmt.Sprint(*w.config.IONice.ClassData))
+	}
+	// TODO: should we use "-t" option with ionice ?
+	// newCommand.Args = append(newCommand.Args, "-t")
+
+	// append oldCommand as args of newCommand
+	newCommand.Args = append(newCommand.Args, oldCommand.Name)
+	newCommand.Args = append(newCommand.Args, oldCommand.Args...)
+	return newCommand
+}
+
+func (w *ResticWrapper) applyNiceSettings(oldCommand Command) Command {
+	if w.config.Nice == nil {
+		return oldCommand
+	}
+	newCommand := Command{
+		Name: NiceCMD,
+	}
+	if w.config.Nice.Adjustment != nil {
+		newCommand.Args = append(newCommand.Args, "-n", fmt.Sprint(*w.config.Nice.Adjustment))
+	}
+
+	// append oldCommand as args of newCommand
+	newCommand.Args = append(newCommand.Args, oldCommand.Name)
+	newCommand.Args = append(newCommand.Args, oldCommand.Args...)
+	return newCommand
 }

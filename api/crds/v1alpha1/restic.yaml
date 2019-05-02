@@ -338,18 +338,27 @@ spec:
                   properties:
                     container:
                       type: string
+                    maxConnections:
+                      format: int32
+                      type: integer
                     prefix:
                       type: string
                 b2:
                   properties:
                     bucket:
                       type: string
+                    maxConnections:
+                      format: int32
+                      type: integer
                     prefix:
                       type: string
                 gcs:
                   properties:
                     bucket:
                       type: string
+                    maxConnections:
+                      format: int32
+                      type: integer
                     prefix:
                       type: string
                 local:
@@ -1518,6 +1527,10 @@ spec:
                           type: string
                       required:
                       - volumePath
+                rest:
+                  properties:
+                    url:
+                      type: string
                 s3:
                   properties:
                     bucket:

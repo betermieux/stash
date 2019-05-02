@@ -9,6 +9,7 @@ import (
 	"github.com/appscode/stash/apis"
 	rep "github.com/appscode/stash/apis/repositories/v1alpha1"
 	api "github.com/appscode/stash/apis/stash/v1alpha1"
+	"github.com/appscode/stash/apis/stash/v1beta1"
 	cs "github.com/appscode/stash/client/clientset/versioned"
 	"github.com/appscode/stash/pkg/controller"
 	"github.com/appscode/stash/pkg/eventer"
@@ -21,6 +22,10 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+)
+
+var (
+	files = []string{"test-data1.txt", "test-data2.txt", "test-data3.txt", "test-data4.txt", "test-data5.txt"}
 )
 
 const (
@@ -149,6 +154,74 @@ func (f *Framework) CreateDemoData(meta metav1.ObjectMeta) error {
 	return nil
 }
 
+func (f *Framework) ReadSampleDataFromMountedDirectory(meta metav1.ObjectMeta, paths []string, resourceKind string) ([]string, error) {
+	switch resourceKind {
+	case apis.KindDeployment, apis.KindReplicaSet, apis.KindReplicationController:
+		pod, err := f.GetPod(meta)
+		if err != nil {
+			return nil, err
+		}
+		var data string
+		datas := make([]string, 0)
+		for _, p := range paths {
+			data, err = f.ExecOnPod(pod, "ls", "-R", p)
+			if err != nil {
+				return nil, err
+			}
+			datas = append(datas, data)
+		}
+		return datas, err
+	case apis.KindStatefulSet, apis.KindDaemonSet:
+		datas := make([]string, 0)
+		pods, err := f.GetAllPod(meta)
+		if err != nil {
+			return datas, err
+		}
+		for _, path := range paths {
+			for _, pod := range pods {
+				data, err := f.ExecOnPod(&pod, "ls", "-R", path)
+				if err != nil {
+					continue
+				}
+				datas = append(datas, data)
+			}
+		}
+		return datas, err
+	}
+	return []string{}, nil
+}
+
+func (f *Framework) ReadSampleDataFromFromWorkload(meta metav1.ObjectMeta, resourceKind string) ([]string, error) {
+	switch resourceKind {
+	case apis.KindDeployment, apis.KindReplicaSet, apis.KindReplicationController, apis.KindPersistentVolumeClaim:
+		pod, err := f.GetPod(meta)
+		if err != nil {
+			return nil, err
+		}
+		var data string
+		datas := make([]string, 0)
+		data, err = f.ExecOnPod(pod, "ls", "-R", TestSourceDataMountPath)
+		datas = append(datas, data)
+		return datas, nil
+	case apis.KindStatefulSet, apis.KindDaemonSet:
+		datas := make([]string, 0)
+		pods, err := f.GetAllPod(meta)
+		if err != nil {
+			return datas, err
+		}
+		for _, pod := range pods {
+			data, err := f.ExecOnPod(&pod, "ls", "-R", TestSourceDataMountPath)
+			if err != nil {
+				return datas, err
+			}
+			datas = append(datas, data)
+		}
+		return datas, err
+
+	}
+	return []string{}, nil
+}
+
 func (f *Framework) CreateDirectory(meta metav1.ObjectMeta, directories []string) error {
 	pod, err := f.GetPod(meta)
 	if err != nil {
@@ -264,6 +337,33 @@ func GetPathsFromResticFileGroups(restic *api.Restic) []string {
 		paths = append(paths, fg.Path)
 	}
 	return paths
+}
+
+func GetPathsFromRestoreSession(restoreSession *v1beta1.RestoreSession) []string {
+	paths := make([]string, 0)
+	for i := range restoreSession.Spec.Rules {
+		for _, p := range restoreSession.Spec.Rules[i].Paths {
+			paths = append(paths, p)
+		}
+	}
+	paths = removeDuplicates(paths)
+	return paths
+}
+
+func removeDuplicates(elements []string) []string {
+	encountered := map[string]bool{}
+
+	// Create a map of all unique elements.
+	for v := range elements {
+		encountered[elements[v]] = true
+	}
+
+	// Place all keys from the map into a slice.
+	result := []string{}
+	for key := range encountered {
+		result = append(result, key)
+	}
+	return result
 }
 
 func (f *Framework) EventuallyJobSucceed(name string) GomegaAsyncAssertion {
@@ -409,6 +509,32 @@ func WaitUntilResticDeleted(sc cs.Interface, meta metav1.ObjectMeta) error {
 	})
 }
 
+func WaitUntilBackupConfigurationDeleted(sc cs.Interface, meta metav1.ObjectMeta) error {
+	return wait.PollImmediate(PullInterval, WaitTimeOut, func() (done bool, err error) {
+		if _, err := sc.StashV1beta1().BackupConfigurations(meta.Namespace).Get(meta.Name, metav1.GetOptions{}); err != nil {
+			if kerr.IsNotFound(err) {
+				return true, nil
+			} else {
+				return true, err
+			}
+		}
+		return false, nil
+	})
+}
+
+func WaitUntilRestoreSessionDeleted(sc cs.Interface, meta metav1.ObjectMeta) error {
+	return wait.PollImmediate(PullInterval, WaitTimeOut, func() (done bool, err error) {
+		if _, err := sc.StashV1beta1().RestoreSessions(meta.Namespace).Get(meta.Name, metav1.GetOptions{}); err != nil {
+			if kerr.IsNotFound(err) {
+				return true, nil
+			} else {
+				return true, err
+			}
+		}
+		return false, nil
+	})
+}
+
 func WaitUntilRecoveryDeleted(sc cs.Interface, meta metav1.ObjectMeta) error {
 
 	return wait.PollImmediate(PullInterval, WaitTimeOut, func() (done bool, err error) {
@@ -443,6 +569,19 @@ func WaitUntilRepositoriesDeleted(sc cs.Interface, repositories []*api.Repositor
 		return false, nil
 	})
 }
+func WaitUntilRepositoryDeleted(sc cs.Interface, repository *api.Repository) error {
+
+	return wait.PollImmediate(PullInterval, WaitTimeOut, func() (done bool, err error) {
+		if _, err := sc.StashV1alpha1().Repositories(repository.Namespace).Get(repository.Name, metav1.GetOptions{}); err != nil {
+			if kerr.IsNotFound(err) {
+				return true, nil
+			} else {
+				return true, err
+			}
+		}
+		return false, nil
+	})
+}
 
 func (f *Framework) WaitUntilDaemonPodReady(meta metav1.ObjectMeta) error {
 
@@ -451,10 +590,11 @@ func (f *Framework) WaitUntilDaemonPodReady(meta metav1.ObjectMeta) error {
 		if err != nil {
 			return false, nil
 		}
-		if pod.Status.Phase == core.PodPhase(core.PodReady) {
+		if pod.Status.Phase == core.PodPhase(core.PodRunning) {
 			return true, nil
 		}
 		return false, nil
+
 	})
 }
 
@@ -475,4 +615,66 @@ func (f *Framework) GetNodeName(meta metav1.ObjectMeta) string {
 
 	// if none of above succeed, return default testing node "minikube"
 	return "minikube"
+}
+
+func (f *Framework) CreateSampleDataInsideWorkload(meta metav1.ObjectMeta, resourceKind string) error {
+	switch resourceKind {
+	case apis.KindDeployment, apis.KindReplicaSet, apis.KindReplicationController, apis.KindPersistentVolumeClaim:
+		pod, err := f.GetPod(meta)
+		if err != nil {
+			return err
+		}
+		_, err = f.ExecOnPod(pod, "touch", filepath.Join(TestSourceDataMountPath, files[0]))
+		if err != nil {
+			return err
+		}
+	case apis.KindStatefulSet, apis.KindDaemonSet:
+		pods, err := f.GetAllPod(meta)
+		if err != nil {
+			return err
+		}
+		for i, pod := range pods {
+			_, err := f.ExecOnPod(&pod, "touch", filepath.Join(TestSourceDataMountPath, files[i]))
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (f *Invocation) CleanupSampleDataFromWorkload(meta metav1.ObjectMeta, resourceKind string) error {
+
+	switch resourceKind {
+	case apis.KindDeployment, apis.KindReplicaSet, apis.KindReplicationController, apis.KindPersistentVolumeClaim:
+		pod, err := f.GetPod(meta)
+		if err != nil {
+			return err
+		}
+		_, err = f.ExecOnPod(pod, "rm", "-rf", filepath.Join(TestSourceDataMountPath, files[0]))
+		if err != nil {
+			return err
+		}
+	case apis.KindStatefulSet, apis.KindDaemonSet:
+		pods, err := f.GetAllPod(meta)
+		if err != nil {
+			return err
+		}
+		for i, pod := range pods {
+			_, err = f.ExecOnPod(&pod, "rm", "-rf", filepath.Join(TestSourceDataMountPath, files[i]))
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (f *Invocation) ReadDataFromPod(meta metav1.ObjectMeta) (data string, err error) {
+	pod, err := f.GetPod(meta)
+	if err != nil {
+		return "", err
+	}
+	data, err = f.ExecOnPod(pod, "ls", "-R", TestSourceDataMountPath)
+	return data, err
 }

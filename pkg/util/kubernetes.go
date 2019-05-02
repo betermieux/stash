@@ -19,6 +19,7 @@ import (
 	core_util "kmodules.xyz/client-go/core/v1"
 	"kmodules.xyz/client-go/meta"
 	store "kmodules.xyz/objectstore-api/api/v1"
+	oc_cs "kmodules.xyz/openshift/client/clientset/versioned"
 	wapi "kmodules.xyz/webhook-runtime/apis/workload/v1"
 )
 
@@ -27,6 +28,8 @@ const (
 	StashInitContainer   = "stash-init"
 	LocalVolumeName      = "stash-local"
 	ScratchDirVolumeName = "stash-scratchdir"
+	TmpDirVolumeName     = "tmp-dir"
+	TmpDirMountPath      = "/tmp"
 	PodinfoVolumeName    = "stash-podinfo"
 
 	RecoveryJobPrefix   = "stash-recovery-"
@@ -85,6 +88,25 @@ func UpsertScratchVolume(volumes []core.Volume) []core.Volume {
 		VolumeSource: core.VolumeSource{
 			EmptyDir: &core.EmptyDirVolumeSource{},
 		},
+	})
+}
+
+func UpsertTmpVolume(volumes []core.Volume, settings v1beta1_api.EmptyDirSettings) []core.Volume {
+	return core_util.UpsertVolume(volumes, core.Volume{
+		Name: TmpDirVolumeName,
+		VolumeSource: core.VolumeSource{
+			EmptyDir: &core.EmptyDirVolumeSource{
+				Medium:    settings.Medium,
+				SizeLimit: settings.SizeLimit,
+			},
+		},
+	})
+}
+
+func UpsertTmpVolumeMount(volumeMounts []core.VolumeMount) []core.VolumeMount {
+	return core_util.UpsertVolumeMountByPath(volumeMounts, core.VolumeMount{
+		Name:      TmpDirVolumeName,
+		MountPath: TmpDirMountPath,
 	})
 }
 
@@ -338,6 +360,15 @@ func WaitUntilStatefulSetReady(kubeClient kubernetes.Interface, meta metav1.Obje
 	return wait.PollImmediate(RetryInterval, ReadinessTimeout, func() (bool, error) {
 		if obj, err := kubeClient.AppsV1().StatefulSets(meta.Namespace).Get(meta.Name, metav1.GetOptions{}); err == nil {
 			return types.Int32(obj.Spec.Replicas) == obj.Status.ReadyReplicas, nil
+		}
+		return false, nil
+	})
+}
+
+func WaitUntilDeploymentConfigReady(c oc_cs.Interface, meta metav1.ObjectMeta) error {
+	return wait.PollImmediate(RetryInterval, ReadinessTimeout, func() (bool, error) {
+		if obj, err := c.AppsV1().DeploymentConfigs(meta.Namespace).Get(meta.Name, metav1.GetOptions{}); err == nil {
+			return obj.Spec.Replicas == obj.Status.ReadyReplicas, nil
 		}
 		return false, nil
 	})
