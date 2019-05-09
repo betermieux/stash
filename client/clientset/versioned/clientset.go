@@ -19,23 +19,19 @@ limitations under the License.
 package versioned
 
 import (
-	repositoriesv1alpha1 "github.com/appscode/stash/client/clientset/versioned/typed/repositories/v1alpha1"
-	stashv1alpha1 "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1alpha1"
-	stashv1beta1 "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1beta1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
+	repositoriesv1alpha1 "stash.appscode.dev/stash/client/clientset/versioned/typed/repositories/v1alpha1"
+	stashv1alpha1 "stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1alpha1"
+	stashv1beta1 "stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1beta1"
 )
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	RepositoriesV1alpha1() repositoriesv1alpha1.RepositoriesV1alpha1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Repositories() repositoriesv1alpha1.RepositoriesV1alpha1Interface
 	StashV1alpha1() stashv1alpha1.StashV1alpha1Interface
 	StashV1beta1() stashv1beta1.StashV1beta1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Stash() stashv1beta1.StashV1beta1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -52,12 +48,6 @@ func (c *Clientset) RepositoriesV1alpha1() repositoriesv1alpha1.RepositoriesV1al
 	return c.repositoriesV1alpha1
 }
 
-// Deprecated: Repositories retrieves the default version of RepositoriesClient.
-// Please explicitly pick a version.
-func (c *Clientset) Repositories() repositoriesv1alpha1.RepositoriesV1alpha1Interface {
-	return c.repositoriesV1alpha1
-}
-
 // StashV1alpha1 retrieves the StashV1alpha1Client
 func (c *Clientset) StashV1alpha1() stashv1alpha1.StashV1alpha1Interface {
 	return c.stashV1alpha1
@@ -65,12 +55,6 @@ func (c *Clientset) StashV1alpha1() stashv1alpha1.StashV1alpha1Interface {
 
 // StashV1beta1 retrieves the StashV1beta1Client
 func (c *Clientset) StashV1beta1() stashv1beta1.StashV1beta1Interface {
-	return c.stashV1beta1
-}
-
-// Deprecated: Stash retrieves the default version of StashClient.
-// Please explicitly pick a version.
-func (c *Clientset) Stash() stashv1beta1.StashV1beta1Interface {
 	return c.stashV1beta1
 }
 

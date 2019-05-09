@@ -4,16 +4,16 @@ import (
 	"time"
 
 	"github.com/appscode/go/log"
-	cs "github.com/appscode/stash/client/clientset/versioned"
-	stashinformers "github.com/appscode/stash/client/informers/externalversions"
-	"github.com/appscode/stash/pkg/backup"
-	"github.com/appscode/stash/pkg/eventer"
-	"github.com/appscode/stash/pkg/restic"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"kmodules.xyz/client-go/meta"
+	cs "stash.appscode.dev/stash/client/clientset/versioned"
+	stashinformers "stash.appscode.dev/stash/client/informers/externalversions"
+	"stash.appscode.dev/stash/pkg/backup"
+	"stash.appscode.dev/stash/pkg/eventer"
+	"stash.appscode.dev/stash/pkg/restic"
 )
 
 func NewCmdRunBackup() *cobra.Command {
@@ -66,7 +66,6 @@ func NewCmdRunBackup() *cobra.Command {
 	cmd.Flags().BoolVar(&con.SetupOpt.EnableCache, "enable-cache", con.SetupOpt.EnableCache, "Specify weather to enable caching for restic")
 	cmd.Flags().IntVar(&con.SetupOpt.MaxConnections, "max-connections", con.SetupOpt.MaxConnections, "Specify maximum concurrent connections for GCS, Azure and B2 backend")
 	cmd.Flags().BoolVar(&con.Metrics.Enabled, "metrics-enabled", con.Metrics.Enabled, "Specify weather to export Prometheus metrics")
-	cmd.Flags().BoolVar(&con.EnableRBAC, "enable-rbac", con.EnableRBAC, "Enable RBAC")
 	cmd.Flags().StringVar(&con.Metrics.PushgatewayURL, "pushgateway-url", con.Metrics.PushgatewayURL, "URL of Prometheus pushgateway used to cache backup metrics")
 
 	return cmd

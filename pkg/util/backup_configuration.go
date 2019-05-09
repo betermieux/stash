@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/appscode/stash/apis/stash/v1alpha1"
-	v1beta1_api "github.com/appscode/stash/apis/stash/v1beta1"
-	cs "github.com/appscode/stash/client/clientset/versioned"
-	v1beta1_listers "github.com/appscode/stash/client/listers/stash/v1beta1"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"kmodules.xyz/client-go/meta"
 	wapi "kmodules.xyz/webhook-runtime/apis/workload/v1"
+	"stash.appscode.dev/stash/apis/stash/v1alpha1"
+	v1beta1_api "stash.appscode.dev/stash/apis/stash/v1beta1"
+	cs "stash.appscode.dev/stash/client/clientset/versioned"
+	v1beta1_listers "stash.appscode.dev/stash/client/listers/stash/v1beta1"
 )
 
 // GetAppliedBackupConfiguration check weather BackupConfiguration was applied as annotation and returns the object definition if exist.
@@ -45,7 +45,7 @@ func FindBackupConfiguration(lister v1beta1_listers.BackupConfigurationLister, w
 	result := make([]*v1beta1_api.BackupConfiguration, 0)
 	// keep only those BackupConfiguration that has this workload as target
 	for _, bc := range backupConfigurations {
-		if bc.DeletionTimestamp == nil && IsTarget(bc.Spec.Target, w) {
+		if bc.DeletionTimestamp == nil && IsBackupTarget(bc.Spec.Target, w) {
 			result = append(result, bc)
 		}
 	}

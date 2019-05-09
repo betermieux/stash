@@ -6,11 +6,6 @@ import (
 
 	"github.com/appscode/go/log"
 	stringz "github.com/appscode/go/strings"
-	"github.com/appscode/stash/apis"
-	api_v1alpha1 "github.com/appscode/stash/apis/stash/v1alpha1"
-	api_v1beta1 "github.com/appscode/stash/apis/stash/v1beta1"
-	"github.com/appscode/stash/pkg/docker"
-	"github.com/appscode/stash/pkg/util"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,18 +16,24 @@ import (
 	core_util "kmodules.xyz/client-go/core/v1"
 	"kmodules.xyz/client-go/meta"
 	wapi "kmodules.xyz/webhook-runtime/apis/workload/v1"
+	"stash.appscode.dev/stash/apis"
+	api_v1alpha1 "stash.appscode.dev/stash/apis/stash/v1alpha1"
+	api_v1beta1 "stash.appscode.dev/stash/apis/stash/v1beta1"
+	"stash.appscode.dev/stash/pkg/docker"
+	"stash.appscode.dev/stash/pkg/util"
 )
 
-func (c *StashController) ensureWorkloadSidecar(w *wapi.Workload, restic *api_v1alpha1.Restic) error {
-	if c.EnableRBAC {
-		sa := stringz.Val(w.Spec.Template.Spec.ServiceAccountName, "default")
-		ref, err := reference.GetReference(scheme.Scheme, w)
-		if err != nil {
-			ref = &core.ObjectReference{
-				Name:      w.Name,
-				Namespace: w.Namespace,
-			}
+func (c *StashController) ensureWorkloadSidecar(w *wapi.Workload, restic *api_v1alpha1.Restic, caller string) error {
+	sa := stringz.Val(w.Spec.Template.Spec.ServiceAccountName, "default")
+	ref, err := reference.GetReference(scheme.Scheme, w)
+	if err != nil {
+		ref = &core.ObjectReference{
+			Name:      w.Name,
+			Namespace: w.Namespace,
 		}
+	}
+	//Don't create RBAC stuff when the caller is webhook to make the webhooks side effect free.
+	if caller != util.CallerWebhook {
 		err = c.ensureSidecarRoleBinding(ref, sa)
 		if err != nil {
 			return err
@@ -44,7 +45,7 @@ func (c *StashController) ensureWorkloadSidecar(w *wapi.Workload, restic *api_v1
 		return err
 	}
 
-	_, err := c.kubeClient.CoreV1().Secrets(w.Namespace).Get(restic.Spec.Backend.StorageSecretName, metav1.GetOptions{})
+	_, err = c.kubeClient.CoreV1().Secrets(w.Namespace).Get(restic.Spec.Backend.StorageSecretName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -60,7 +61,7 @@ func (c *StashController) ensureWorkloadSidecar(w *wapi.Workload, restic *api_v1
 		Image:    docker.ImageStash,
 		Tag:      c.StashImageTag,
 	}
-	ref := api_v1alpha1.LocalTypedReference{
+	localRef := api_v1alpha1.LocalTypedReference{
 		Kind: w.Kind,
 		Name: w.Name,
 	}
@@ -68,12 +69,12 @@ func (c *StashController) ensureWorkloadSidecar(w *wapi.Workload, restic *api_v1
 	if restic.Spec.Type == api_v1alpha1.BackupOffline {
 		w.Spec.Template.Spec.InitContainers = core_util.UpsertContainer(
 			w.Spec.Template.Spec.InitContainers,
-			util.NewInitContainer(restic, ref, image, c.EnableRBAC),
+			util.NewInitContainer(restic, localRef, image),
 		)
 	} else {
 		w.Spec.Template.Spec.Containers = core_util.UpsertContainer(
 			w.Spec.Template.Spec.Containers,
-			util.NewSidecarContainer(restic, ref, image, c.EnableRBAC),
+			util.NewSidecarContainer(restic, localRef, image),
 		)
 	}
 
@@ -135,17 +136,18 @@ func (c *StashController) ensureWorkloadSidecarDeleted(w *wapi.Workload, restic 
 	return nil
 }
 
-func (c *StashController) ensureBackupSidecar(w *wapi.Workload, bc *api_v1beta1.BackupConfiguration) error {
-	if c.EnableRBAC {
-		sa := stringz.Val(w.Spec.Template.Spec.ServiceAccountName, "default")
-		ref, err := reference.GetReference(scheme.Scheme, w)
-		if err != nil {
-			ref = &core.ObjectReference{
-				Name:       w.Name,
-				Namespace:  w.Namespace,
-				APIVersion: w.APIVersion,
-			}
+func (c *StashController) ensureBackupSidecar(w *wapi.Workload, bc *api_v1beta1.BackupConfiguration, caller string) error {
+	sa := stringz.Val(w.Spec.Template.Spec.ServiceAccountName, "default")
+	ref, err := reference.GetReference(scheme.Scheme, w)
+	if err != nil {
+		ref = &core.ObjectReference{
+			Name:       w.Name,
+			Namespace:  w.Namespace,
+			APIVersion: w.APIVersion,
 		}
+	}
+	//Don't create RBAC stuff when the caller is webhook to make the webhooks side effect free.
+	if caller != util.CallerWebhook {
 		err = c.ensureSidecarRoleBinding(ref, sa)
 		if err != nil {
 			return err
@@ -182,7 +184,7 @@ func (c *StashController) ensureBackupSidecar(w *wapi.Workload, bc *api_v1beta1.
 
 	w.Spec.Template.Spec.Containers = core_util.UpsertContainer(
 		w.Spec.Template.Spec.Containers,
-		util.NewBackupSidecarContainer(bc, &repository.Spec.Backend, image, c.EnableRBAC),
+		util.NewBackupSidecarContainer(bc, &repository.Spec.Backend, image),
 	)
 
 	// keep existing image pull secrets

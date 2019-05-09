@@ -6,11 +6,6 @@ import (
 	"time"
 
 	"github.com/appscode/go/log"
-	"github.com/appscode/stash/apis"
-	api "github.com/appscode/stash/apis/stash/v1alpha1"
-	"github.com/appscode/stash/client/clientset/versioned/scheme"
-	"github.com/appscode/stash/pkg/eventer"
-	"github.com/appscode/stash/pkg/util"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	core "k8s.io/api/core/v1"
@@ -20,6 +15,11 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/reference"
+	"stash.appscode.dev/stash/apis"
+	api "stash.appscode.dev/stash/apis/stash/v1alpha1"
+	"stash.appscode.dev/stash/client/clientset/versioned/scheme"
+	"stash.appscode.dev/stash/pkg/eventer"
+	"stash.appscode.dev/stash/pkg/util"
 )
 
 func (c *Controller) BackupScheduler() error {
@@ -70,7 +70,14 @@ func (c *Controller) electLeader() error {
 		Identity:      c.opt.PodName,
 		EventRecorder: c.recorder,
 	}
-	resLock, err := resourcelock.New(resourcelock.ConfigMapsResourceLock, c.opt.Namespace, util.GetConfigmapLockName(c.opt.Workload), c.k8sClient.CoreV1(), rlc)
+	resLock, err := resourcelock.New(
+		resourcelock.ConfigMapsResourceLock,
+		c.opt.Namespace,
+		util.GetConfigmapLockName(c.opt.Workload),
+		c.k8sClient.CoreV1(),
+		c.k8sClient.CoordinationV1(),
+		rlc,
+	)
 	if err != nil {
 		return fmt.Errorf("error during leader election: %s", err)
 	}

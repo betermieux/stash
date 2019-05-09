@@ -7,17 +7,17 @@ import (
 
 	"github.com/appscode/go/log"
 	v "github.com/appscode/go/version"
-	"github.com/appscode/stash/apis"
-	cs "github.com/appscode/stash/client/clientset/versioned"
-	"github.com/appscode/stash/pkg/backup"
-	"github.com/appscode/stash/pkg/docker"
-	"github.com/appscode/stash/pkg/scale"
-	"github.com/appscode/stash/pkg/util"
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"kmodules.xyz/client-go/meta"
 	"kmodules.xyz/client-go/tools/cli"
+	"stash.appscode.dev/stash/apis"
+	cs "stash.appscode.dev/stash/client/clientset/versioned"
+	"stash.appscode.dev/stash/pkg/backup"
+	"stash.appscode.dev/stash/pkg/docker"
+	"stash.appscode.dev/stash/pkg/scale"
+	"stash.appscode.dev/stash/pkg/util"
 )
 
 func NewCmdBackup() *cobra.Command {
@@ -130,7 +130,6 @@ func NewCmdBackup() *cobra.Command {
 	cmd.Flags().BoolVar(&opt.RunViaCron, "run-via-cron", opt.RunViaCron, "Run backup periodically via cron.")
 	cmd.Flags().StringVar(&opt.DockerRegistry, "docker-registry", opt.DockerRegistry, "Check job image registry.")
 	cmd.Flags().StringVar(&opt.ImageTag, "image-tag", opt.ImageTag, "Check job image tag.")
-	cmd.Flags().BoolVar(&opt.EnableRBAC, "enable-rbac", opt.EnableRBAC, "Enable RBAC")
 
 	return cmd
 }

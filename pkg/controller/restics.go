@@ -4,11 +4,6 @@ import (
 	"fmt"
 
 	"github.com/appscode/go/log"
-	"github.com/appscode/stash/apis/stash"
-	api "github.com/appscode/stash/apis/stash/v1alpha1"
-	"github.com/appscode/stash/pkg/docker"
-	"github.com/appscode/stash/pkg/eventer"
-	"github.com/appscode/stash/pkg/util"
 	"github.com/golang/glog"
 	batch "k8s.io/api/batch/v1beta1"
 	core "k8s.io/api/core/v1"
@@ -26,6 +21,11 @@ import (
 	"kmodules.xyz/webhook-runtime/admission"
 	hooks "kmodules.xyz/webhook-runtime/admission/v1beta1"
 	webhook "kmodules.xyz/webhook-runtime/admission/v1beta1/generic"
+	"stash.appscode.dev/stash/apis/stash"
+	api "stash.appscode.dev/stash/apis/stash/v1alpha1"
+	"stash.appscode.dev/stash/pkg/docker"
+	"stash.appscode.dev/stash/pkg/eventer"
+	"stash.appscode.dev/stash/pkg/util"
 )
 
 // TODO: Add validator that will reject to create Restic if any BackupConfiguration exist for target workload
@@ -197,23 +197,19 @@ func (c *StashController) EnsureScaledownCronJob(restic *api.Restic) error {
 		in.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = restic.Spec.ImagePullSecrets
 
 		in.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy = core.RestartPolicyNever
-		if c.EnableRBAC {
-			in.Spec.JobTemplate.Spec.Template.Spec.ServiceAccountName = in.Name
-		}
+		in.Spec.JobTemplate.Spec.Template.Spec.ServiceAccountName = in.Name
 		return in
 	})
 	if err != nil {
 		return err
 	}
 
-	if c.EnableRBAC {
-		ref, err := reference.GetReference(scheme.Scheme, cronJob)
-		if err != nil {
-			return err
-		}
-		if err = c.ensureScaledownJobRBAC(ref); err != nil {
-			return fmt.Errorf("error ensuring rbac for kubectl cron job %s, reason: %s", meta.Name, err)
-		}
+	ref, err := reference.GetReference(scheme.Scheme, cronJob)
+	if err != nil {
+		return err
+	}
+	if err = c.ensureScaledownJobRBAC(ref); err != nil {
+		return fmt.Errorf("error ensuring rbac for kubectl cron job %s, reason: %s", meta.Name, err)
 	}
 
 	return nil

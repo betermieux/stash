@@ -7,17 +7,6 @@ import (
 	"time"
 
 	"github.com/appscode/go/log"
-	"github.com/appscode/stash/apis"
-	api_v1beta1 "github.com/appscode/stash/apis/stash/v1beta1"
-	cs "github.com/appscode/stash/client/clientset/versioned"
-	stash_scheme "github.com/appscode/stash/client/clientset/versioned/scheme"
-	v1beta1_util "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1beta1/util"
-	stashinformers "github.com/appscode/stash/client/informers/externalversions"
-	"github.com/appscode/stash/client/listers/stash/v1beta1"
-	"github.com/appscode/stash/pkg/eventer"
-	"github.com/appscode/stash/pkg/restic"
-	"github.com/appscode/stash/pkg/status"
-	"github.com/appscode/stash/pkg/util"
 	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -30,6 +19,17 @@ import (
 	"k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"kmodules.xyz/client-go/tools/queue"
+	"stash.appscode.dev/stash/apis"
+	api_v1beta1 "stash.appscode.dev/stash/apis/stash/v1beta1"
+	cs "stash.appscode.dev/stash/client/clientset/versioned"
+	stash_scheme "stash.appscode.dev/stash/client/clientset/versioned/scheme"
+	v1beta1_util "stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1beta1/util"
+	stashinformers "stash.appscode.dev/stash/client/informers/externalversions"
+	"stash.appscode.dev/stash/client/listers/stash/v1beta1"
+	"stash.appscode.dev/stash/pkg/eventer"
+	"stash.appscode.dev/stash/pkg/restic"
+	"stash.appscode.dev/stash/pkg/status"
+	"stash.appscode.dev/stash/pkg/util"
 )
 
 type BackupSessionController struct {
@@ -40,7 +40,6 @@ type BackupSessionController struct {
 	StashInformerFactory stashinformers.SharedInformerFactory
 	MaxNumRequeues       int
 	NumThreads           int
-	EnableRBAC           bool // rbac for check job
 	ResyncPeriod         time.Duration
 	//backupConfiguration
 	BackupConfigurationName string
@@ -276,6 +275,7 @@ func (c *BackupSessionController) electLeaderPod(backupConfiguration *api_v1beta
 		backupConfiguration.Namespace,
 		util.GetBackupConfigmapLockName(backupConfiguration.Spec.Target.Ref),
 		c.K8sClient.CoreV1(),
+		c.K8sClient.CoordinationV1(),
 		rlc,
 	)
 	if err != nil {
@@ -330,6 +330,7 @@ func (c *BackupSessionController) electBackupLeader(backupSession *api_v1beta1.B
 		backupConfiguration.Namespace,
 		util.GetBackupConfigmapLockName(backupConfiguration.Spec.Target.Ref),
 		c.K8sClient.CoreV1(),
+		c.K8sClient.CoordinationV1(),
 		rlc,
 	)
 	if err != nil {

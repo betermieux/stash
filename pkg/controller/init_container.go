@@ -5,9 +5,6 @@ import (
 
 	"github.com/appscode/go/log"
 	stringz "github.com/appscode/go/strings"
-	api_v1beta1 "github.com/appscode/stash/apis/stash/v1beta1"
-	"github.com/appscode/stash/pkg/docker"
-	"github.com/appscode/stash/pkg/util"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -15,19 +12,23 @@ import (
 	core_util "kmodules.xyz/client-go/core/v1"
 	"kmodules.xyz/client-go/meta"
 	wapi "kmodules.xyz/webhook-runtime/apis/workload/v1"
+	api_v1beta1 "stash.appscode.dev/stash/apis/stash/v1beta1"
+	"stash.appscode.dev/stash/pkg/docker"
+	"stash.appscode.dev/stash/pkg/util"
 )
 
-func (c *StashController) ensureRestoreInitContainer(w *wapi.Workload, rs *api_v1beta1.RestoreSession) error {
+func (c *StashController) ensureRestoreInitContainer(w *wapi.Workload, rs *api_v1beta1.RestoreSession, caller string) error {
 	// if RBAC is enabled then ensure ServiceAccount and respective ClusterRole and RoleBinding
-	if c.EnableRBAC {
-		sa := stringz.Val(w.Spec.Template.Spec.ServiceAccountName, "default")
-		ref, err := reference.GetReference(scheme.Scheme, w)
-		if err != nil {
-			ref = &core.ObjectReference{
-				Name:      w.Name,
-				Namespace: w.Namespace,
-			}
+	sa := stringz.Val(w.Spec.Template.Spec.ServiceAccountName, "default")
+	ref, err := reference.GetReference(scheme.Scheme, w)
+	if err != nil {
+		ref = &core.ObjectReference{
+			Name:      w.Name,
+			Namespace: w.Namespace,
 		}
+	}
+	//Don't create RBAC stuff when the caller is webhook to make the webhooks side effect free.
+	if caller != util.CallerWebhook {
 		err = c.ensureRestoreInitContainerRBAC(ref, sa)
 		if err != nil {
 			return err
@@ -67,7 +68,7 @@ func (c *StashController) ensureRestoreInitContainer(w *wapi.Workload, rs *api_v
 	// insert restore init container
 	w.Spec.Template.Spec.InitContainers = core_util.UpsertContainer(
 		w.Spec.Template.Spec.InitContainers,
-		util.NewRestoreInitContainer(rs, repository, image, c.EnableRBAC),
+		util.NewRestoreInitContainer(rs, repository, image),
 	)
 
 	// keep existing image pull secrets and add new image pull secrets if specified in RestoreSession spec.

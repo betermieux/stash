@@ -26,7 +26,6 @@ stash backup [flags]
 ```
       --burst int                The maximum burst for throttle (default 100)
       --docker-registry string   Check job image registry. (default "appscode")
-      --enable-rbac              Enable RBAC
   -h, --help                     help for backup
       --image-tag string         Check job image tag.
       --kubeconfig string        Path to kubeconfig file with authorization information (the master location is set by the master flag).

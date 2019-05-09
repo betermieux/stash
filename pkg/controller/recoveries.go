@@ -4,13 +4,6 @@ import (
 	"fmt"
 
 	"github.com/appscode/go/log"
-	"github.com/appscode/stash/apis"
-	"github.com/appscode/stash/apis/stash"
-	api "github.com/appscode/stash/apis/stash/v1alpha1"
-	stash_util "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1alpha1/util"
-	"github.com/appscode/stash/pkg/docker"
-	"github.com/appscode/stash/pkg/eventer"
-	"github.com/appscode/stash/pkg/util"
 	"github.com/golang/glog"
 	core "k8s.io/api/core/v1"
 	kerr "k8s.io/apimachinery/pkg/api/errors"
@@ -23,6 +16,13 @@ import (
 	"kmodules.xyz/webhook-runtime/admission"
 	hooks "kmodules.xyz/webhook-runtime/admission/v1beta1"
 	webhook "kmodules.xyz/webhook-runtime/admission/v1beta1/generic"
+	"stash.appscode.dev/stash/apis"
+	"stash.appscode.dev/stash/apis/stash"
+	api "stash.appscode.dev/stash/apis/stash/v1alpha1"
+	stash_util "stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1alpha1/util"
+	"stash.appscode.dev/stash/pkg/docker"
+	"stash.appscode.dev/stash/pkg/eventer"
+	"stash.appscode.dev/stash/pkg/util"
 )
 
 const (
@@ -144,9 +144,7 @@ func (c *StashController) runRecoveryJob(rec *api.Recovery) error {
 		eventer.CreateEvent(c.kubeClient, RecoveryEventComponent, rec, core.EventTypeWarning, eventer.EventReasonJobFailedToCreate, err.Error())
 		return err
 	}
-	if c.EnableRBAC {
-		job.Spec.Template.Spec.ServiceAccountName = job.Name
-	}
+	job.Spec.Template.Spec.ServiceAccountName = job.Name
 
 	job, err = c.kubeClient.BatchV1().Jobs(rec.Namespace).Create(job)
 	if err != nil {
@@ -167,22 +165,20 @@ func (c *StashController) runRecoveryJob(rec *api.Recovery) error {
 		return err
 	}
 
-	if c.EnableRBAC {
-		ref, err := reference.GetReference(scheme.Scheme, job)
-		if err != nil {
-			return err
-		}
-		if err := c.ensureRecoveryRBAC(ref); err != nil {
-			err = fmt.Errorf("error ensuring rbac for recovery job %s, reason: %s", job.Name, err)
-			eventer.CreateEvent(c.kubeClient, RecoveryEventComponent, rec, core.EventTypeWarning, eventer.EventReasonJobFailedToCreate, err.Error())
-			return err
-		}
+	ref, err := reference.GetReference(scheme.Scheme, job)
+	if err != nil {
+		return err
+	}
+	if err := c.ensureRecoveryRBAC(ref); err != nil {
+		err = fmt.Errorf("error ensuring rbac for recovery job %s, reason: %s", job.Name, err)
+		eventer.CreateEvent(c.kubeClient, RecoveryEventComponent, rec, core.EventTypeWarning, eventer.EventReasonJobFailedToCreate, err.Error())
+		return err
+	}
 
-		if err := c.ensureRepoReaderRBAC(ref, rec); err != nil {
-			err = fmt.Errorf("error ensuring repository-reader rbac for recovery job %s, reason: %s", job.Name, err)
-			eventer.CreateEvent(c.kubeClient, RecoveryEventComponent, rec, core.EventTypeWarning, eventer.EventReasonJobFailedToCreate, err.Error())
-			return err
-		}
+	if err := c.ensureRepoReaderRBAC(ref, rec); err != nil {
+		err = fmt.Errorf("error ensuring repository-reader rbac for recovery job %s, reason: %s", job.Name, err)
+		eventer.CreateEvent(c.kubeClient, RecoveryEventComponent, rec, core.EventTypeWarning, eventer.EventReasonJobFailedToCreate, err.Error())
+		return err
 	}
 
 	log.Infoln("Recovery job created:", job.Name)

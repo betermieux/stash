@@ -5,15 +5,6 @@ import (
 	"time"
 
 	"github.com/appscode/go/log"
-	"github.com/appscode/stash/apis"
-	"github.com/appscode/stash/apis/stash"
-	api_v1beta1 "github.com/appscode/stash/apis/stash/v1beta1"
-	stash_scheme "github.com/appscode/stash/client/clientset/versioned/scheme"
-	stash_util "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1beta1/util"
-	v1beta1_util "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1beta1/util"
-	"github.com/appscode/stash/pkg/eventer"
-	"github.com/appscode/stash/pkg/resolve"
-	"github.com/appscode/stash/pkg/util"
 	"github.com/golang/glog"
 	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
@@ -28,6 +19,15 @@ import (
 	"kmodules.xyz/webhook-runtime/admission"
 	hooks "kmodules.xyz/webhook-runtime/admission/v1beta1"
 	webhook "kmodules.xyz/webhook-runtime/admission/v1beta1/generic"
+	"stash.appscode.dev/stash/apis"
+	"stash.appscode.dev/stash/apis/stash"
+	api_v1beta1 "stash.appscode.dev/stash/apis/stash/v1beta1"
+	stash_scheme "stash.appscode.dev/stash/client/clientset/versioned/scheme"
+	stash_util "stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1beta1/util"
+	v1beta1_util "stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1beta1/util"
+	"stash.appscode.dev/stash/pkg/eventer"
+	"stash.appscode.dev/stash/pkg/resolve"
+	"stash.appscode.dev/stash/pkg/util"
 )
 
 const (
@@ -180,32 +180,30 @@ func (c *StashController) ensureRestoreJob(restoreSession *api_v1beta1.RestoreSe
 
 	// if RBAC is enabled then ensure respective ClusterRole,RoleBinding,ServiceAccount etc.
 	serviceAccountName := "default"
-	if c.EnableRBAC {
-		if restoreSession.Spec.RuntimeSettings.Pod != nil &&
-			restoreSession.Spec.RuntimeSettings.Pod.ServiceAccountName != "" {
-			// ServiceAccount has been specified, so use it.
-			serviceAccountName = restoreSession.Spec.RuntimeSettings.Pod.ServiceAccountName
-		} else {
-			// ServiceAccount hasn't been specified. so create new one with same name as RestoreSession object.
-			serviceAccountName = objectMeta.Name
+	if restoreSession.Spec.RuntimeSettings.Pod != nil &&
+		restoreSession.Spec.RuntimeSettings.Pod.ServiceAccountName != "" {
+		// ServiceAccount has been specified, so use it.
+		serviceAccountName = restoreSession.Spec.RuntimeSettings.Pod.ServiceAccountName
+	} else {
+		// ServiceAccount hasn't been specified. so create new one with same name as RestoreSession object.
+		serviceAccountName = objectMeta.Name
 
-			_, _, err := core_util.CreateOrPatchServiceAccount(c.kubeClient, objectMeta, func(in *core.ServiceAccount) *core.ServiceAccount {
-				core_util.EnsureOwnerReference(&in.ObjectMeta, ref)
-				if in.Labels == nil {
-					in.Labels = map[string]string{}
-				}
-				in.Labels[util.LabelApp] = util.AppLabelStash
-				return in
-			})
-			if err != nil {
-				return err
+		_, _, err := core_util.CreateOrPatchServiceAccount(c.kubeClient, objectMeta, func(in *core.ServiceAccount) *core.ServiceAccount {
+			core_util.EnsureOwnerReference(&in.ObjectMeta, ref)
+			if in.Labels == nil {
+				in.Labels = map[string]string{}
 			}
-		}
-
-		err := c.ensureRestoreJobRBAC(ref, serviceAccountName)
+			in.Labels[util.LabelApp] = util.AppLabelStash
+			return in
+		})
 		if err != nil {
 			return err
 		}
+	}
+
+	err = c.ensureRestoreJobRBAC(ref, serviceAccountName)
+	if err != nil {
+		return err
 	}
 
 	// get repository for backupConfig
@@ -265,9 +263,7 @@ func (c *StashController) ensureRestoreJob(restoreSession *api_v1beta1.RestoreSe
 			util.LabelApp: util.AppLabelStashV1Beta1,
 		}
 		in.Spec.Template.Spec = podSpec
-		if c.EnableRBAC {
-			in.Spec.Template.Spec.ServiceAccountName = serviceAccountName
-		}
+		in.Spec.Template.Spec.ServiceAccountName = serviceAccountName
 		return in
 	})
 

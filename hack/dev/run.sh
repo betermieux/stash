@@ -2,7 +2,7 @@
 set -x
 
 GOPATH=$(go env GOPATH)
-REPO_ROOT="$GOPATH/src/github.com/appscode/stash"
+REPO_ROOT="$GOPATH/src/stash.appscode.dev/stash"
 
 pushd $REPO_ROOT
 
@@ -125,7 +125,6 @@ if [ "$STASH_E2E_TEST" = false ]; then # don't run operator while run this scrip
     --authentication-skip-lookup \
     --docker-registry="$STASH_DOCKER_REGISTRY" \
     --image-tag="$STASH_IMAGE_TAG" \
-    --rbac=true \
     --enable-status-subresource=true \
     --v=5
 fi

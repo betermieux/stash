@@ -8,9 +8,6 @@ import (
 
 	"github.com/appscode/go/log"
 	"github.com/appscode/go/types"
-	"github.com/appscode/stash/apis"
-	api "github.com/appscode/stash/apis/stash/v1alpha1"
-	v1beta1_api "github.com/appscode/stash/apis/stash/v1beta1"
 	core "k8s.io/api/core/v1"
 	kerr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +18,9 @@ import (
 	store "kmodules.xyz/objectstore-api/api/v1"
 	oc_cs "kmodules.xyz/openshift/client/clientset/versioned"
 	wapi "kmodules.xyz/webhook-runtime/apis/workload/v1"
+	"stash.appscode.dev/stash/apis"
+	api "stash.appscode.dev/stash/apis/stash/v1alpha1"
+	v1beta1_api "stash.appscode.dev/stash/apis/stash/v1beta1"
 )
 
 const (
@@ -65,7 +65,17 @@ const (
 	ReadinessTimeout = 2 * time.Minute
 )
 
-func IsTarget(target *v1beta1_api.Target, w *wapi.Workload) bool {
+func IsBackupTarget(target *v1beta1_api.BackupTarget, w *wapi.Workload) bool {
+	if target != nil &&
+		target.Ref.APIVersion == w.APIVersion &&
+		target.Ref.Kind == w.Kind &&
+		target.Ref.Name == w.Name {
+		return true
+	}
+	return false
+}
+
+func IsRestoreTarget(target *v1beta1_api.RestoreTarget, w *wapi.Workload) bool {
 	if target != nil &&
 		target.Ref.APIVersion == w.APIVersion &&
 		target.Ref.Kind == w.Kind &&

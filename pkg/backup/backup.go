@@ -7,17 +7,6 @@ import (
 	"time"
 
 	"github.com/appscode/go/log"
-	"github.com/appscode/stash/apis"
-	api "github.com/appscode/stash/apis/stash/v1alpha1"
-	cs "github.com/appscode/stash/client/clientset/versioned"
-	stash_util "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1alpha1/util"
-	stashinformers "github.com/appscode/stash/client/informers/externalversions"
-	stash_listers "github.com/appscode/stash/client/listers/stash/v1alpha1"
-	"github.com/appscode/stash/pkg/cli"
-	"github.com/appscode/stash/pkg/controller"
-	"github.com/appscode/stash/pkg/docker"
-	"github.com/appscode/stash/pkg/eventer"
-	"github.com/appscode/stash/pkg/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/push"
 	cron "gopkg.in/robfig/cron.v2"
@@ -33,6 +22,17 @@ import (
 	core_util "kmodules.xyz/client-go/core/v1"
 	rbac_util "kmodules.xyz/client-go/rbac/v1"
 	"kmodules.xyz/client-go/tools/queue"
+	"stash.appscode.dev/stash/apis"
+	api "stash.appscode.dev/stash/apis/stash/v1alpha1"
+	cs "stash.appscode.dev/stash/client/clientset/versioned"
+	stash_util "stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1alpha1/util"
+	stashinformers "stash.appscode.dev/stash/client/informers/externalversions"
+	stash_listers "stash.appscode.dev/stash/client/listers/stash/v1alpha1"
+	"stash.appscode.dev/stash/pkg/cli"
+	"stash.appscode.dev/stash/pkg/controller"
+	"stash.appscode.dev/stash/pkg/docker"
+	"stash.appscode.dev/stash/pkg/eventer"
+	"stash.appscode.dev/stash/pkg/util"
 )
 
 type Options struct {
@@ -53,7 +53,6 @@ type Options struct {
 	RunViaCron       bool
 	DockerRegistry   string // image registry for check job
 	ImageTag         string // image tag for check job
-	EnableRBAC       bool   // rbac for check job
 	NumThreads       int
 }
 
@@ -155,9 +154,8 @@ func (c *Controller) Backup() error {
 		return err
 	}
 	if errors.IsNotFound(err) {
-		if c.opt.EnableRBAC {
-			job.Spec.Template.Spec.ServiceAccountName = job.Name
-		}
+		job.Spec.Template.Spec.ServiceAccountName = job.Name
+
 		if job, err = c.k8sClient.BatchV1().Jobs(restic.Namespace).Create(job); err != nil {
 			err = fmt.Errorf("failed to get check job, reason: %s", err)
 			ref, rerr := reference.GetReference(scheme.Scheme, repository)
@@ -177,14 +175,12 @@ func (c *Controller) Backup() error {
 		}
 
 		// create service-account and role-binding
-		if c.opt.EnableRBAC {
-			ref, err := reference.GetReference(scheme.Scheme, job)
-			if err != nil {
-				return err
-			}
-			if err = c.ensureCheckRBAC(ref); err != nil {
-				return fmt.Errorf("error ensuring rbac for check job %s, reason: %s", job.Name, err)
-			}
+		ref, err := reference.GetReference(scheme.Scheme, job)
+		if err != nil {
+			return err
+		}
+		if err = c.ensureCheckRBAC(ref); err != nil {
+			return fmt.Errorf("error ensuring rbac for check job %s, reason: %s", job.Name, err)
 		}
 
 		log.Infoln("Created check job:", job.Name)

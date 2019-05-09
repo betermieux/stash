@@ -2,11 +2,11 @@ package framework
 
 import (
 	"github.com/appscode/go/crypto/rand"
-	"github.com/appscode/stash/apis"
-	"github.com/appscode/stash/apis/stash/v1alpha1"
-	"github.com/appscode/stash/apis/stash/v1beta1"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"stash.appscode.dev/stash/apis"
+	"stash.appscode.dev/stash/apis/stash/v1alpha1"
+	"stash.appscode.dev/stash/apis/stash/v1beta1"
 )
 
 func (f *Invocation) BackupConfiguration(repoName string, targetref v1beta1.TargetRef) v1beta1.BackupConfiguration {
@@ -20,7 +20,7 @@ func (f *Invocation) BackupConfiguration(repoName string, targetref v1beta1.Targ
 				Name: repoName,
 			},
 			Schedule: "*/3 * * * *",
-			Target: &v1beta1.Target{
+			Target: &v1beta1.BackupTarget{
 				Ref: targetref,
 				Directories: []string{
 					TestSourceDataMountPath,
@@ -50,8 +50,8 @@ func (f *Invocation) DeleteBackupConfiguration(backupCfg v1beta1.BackupConfigura
 	return f.StashClient.StashV1beta1().BackupConfigurations(backupCfg.Namespace).Delete(backupCfg.Name, &metav1.DeleteOptions{})
 }
 
-func (f *Invocation) PvcBackupTarget(pvcName string) *v1beta1.Target {
-	return &v1beta1.Target{
+func (f *Invocation) PvcBackupTarget(pvcName string) *v1beta1.BackupTarget {
+	return &v1beta1.BackupTarget{
 		Ref: v1beta1.TargetRef{
 			APIVersion: "v1",
 			Kind:       apis.KindPersistentVolumeClaim,

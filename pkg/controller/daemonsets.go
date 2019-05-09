@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"github.com/appscode/stash/apis"
-	"github.com/appscode/stash/pkg/util"
 	"github.com/golang/glog"
 	appsv1 "k8s.io/api/apps/v1"
 	kerr "k8s.io/apimachinery/pkg/api/errors"
@@ -16,6 +14,8 @@ import (
 	webhook "kmodules.xyz/webhook-runtime/admission/v1beta1/workload"
 	wapi "kmodules.xyz/webhook-runtime/apis/workload/v1"
 	wcs "kmodules.xyz/webhook-runtime/client/workload/v1"
+	"stash.appscode.dev/stash/apis"
+	"stash.appscode.dev/stash/pkg/util"
 )
 
 func (c *StashController) NewDaemonSetWebhook() hooks.AdmissionHook {
@@ -32,7 +32,7 @@ func (c *StashController) NewDaemonSetWebhook() hooks.AdmissionHook {
 			CreateFunc: func(obj runtime.Object) (runtime.Object, error) {
 				w := obj.(*wapi.Workload)
 				// apply stash backup/restore logic on this workload
-				modified, err := c.applyStashLogic(w)
+				modified, err := c.applyStashLogic(w, util.CallerWebhook)
 				if err != nil {
 					return w, err
 				}
@@ -47,7 +47,7 @@ func (c *StashController) NewDaemonSetWebhook() hooks.AdmissionHook {
 			UpdateFunc: func(oldObj, newObj runtime.Object) (runtime.Object, error) {
 				w := newObj.(*wapi.Workload)
 				// apply stash backup/restore logic on this workload
-				modified, err := c.applyStashLogic(w)
+				modified, err := c.applyStashLogic(w, util.CallerWebhook)
 				if err != nil {
 					return w, err
 				}
@@ -107,7 +107,7 @@ func (c *StashController) runDaemonSetInjector(key string) error {
 			return err
 		}
 
-		modified, err := c.applyStashLogic(w)
+		modified, err := c.applyStashLogic(w, util.CallerController)
 		if err != nil {
 			glog.Errorf("failed to apply stash logic on DaemonSet %s/%s. Reason: %v", ds.Namespace, ds.Name, err)
 			return err

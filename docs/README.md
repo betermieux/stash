@@ -31,12 +31,12 @@ From here you can learn all about Stash's architecture and how to deploy and use
 - [Setup](/docs/setup/). Setup contains instructions for installing
   the Stash in various cloud providers.
 
-- [Guides](/docs/guides/). Guides show you how to perform tasks with Stash.
+- [Guides](/docs/guides/latest/). Guides show you how to perform tasks with Stash.
 
 - [Reference](/docs/reference/). Detailed exhaustive lists of
 command-line options, configuration options, API definitions, and procedures.
 
-We're always looking for help improving our documentation, so please don't hesitate to [file an issue](https://github.com/appscode/stash/issues/new) if you see some problem. Or better yet, submit your own [contributions](/docs/CONTRIBUTING.md) to help
+We're always looking for help improving our documentation, so please don't hesitate to [file an issue](https://github.com/stashed/stash/issues/new) if you see some problem. Or better yet, submit your own [contributions](/docs/CONTRIBUTING.md) to help
 make our docs better.
 
 ---

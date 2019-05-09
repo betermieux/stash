@@ -1,16 +1,3 @@
----
-title: Backup and Restore PVC | Stash
-description: Backup and Restore PVC using Stash
-menu:
-  product_stash_0.8.3:
-    identifier: backup_restore_pvc
-    name: Backup and Restore PVC
-    parent: guides
-    weight: 15
-product_name: stash
-menu_name: product_stash_0.8.3
-section_menu_id: guides
----
 
 > New to Stash? Please start [here](/docs/concepts/README.md).
 
@@ -29,7 +16,7 @@ $ kubectl create ns demo
 namespace/demo created
 ```
 
->Note: YAML files used in this tutorial are stored in [./docs/examples/pvc](./docs/examples/pvc) directory of [appscode/stash](https://github.com/appscode/stash) repository.
+>Note: YAML files used in this tutorial are stored in [./docs/examples/pvc](./docs/examples/pvc) directory of [appscode/stash](https://github.com/stashed/stash) repository.
 
 ## Create Service Account
 

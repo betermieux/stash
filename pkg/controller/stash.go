@@ -4,10 +4,6 @@ import (
 	"fmt"
 
 	"github.com/appscode/go/types"
-	"github.com/appscode/stash/apis"
-	api_v1alpha1 "github.com/appscode/stash/apis/stash/v1alpha1"
-	api_v1beta1 "github.com/appscode/stash/apis/stash/v1beta1"
-	"github.com/appscode/stash/pkg/util"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
@@ -18,18 +14,22 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	wapi "kmodules.xyz/webhook-runtime/apis/workload/v1"
 	wcs "kmodules.xyz/webhook-runtime/client/workload/v1"
+	"stash.appscode.dev/stash/apis"
+	api_v1alpha1 "stash.appscode.dev/stash/apis/stash/v1alpha1"
+	api_v1beta1 "stash.appscode.dev/stash/apis/stash/v1beta1"
+	"stash.appscode.dev/stash/pkg/util"
 )
 
 // applyStashLogic takes an workload and perform some processing on it if any backup or restore is configured for this workload.
-func (c *StashController) applyStashLogic(w *wapi.Workload) (bool, error) {
+func (c *StashController) applyStashLogic(w *wapi.Workload, caller string) (bool, error) {
 	// check if restore is configured for this workload and perform respective operations
-	modifiedByRestoreLogic, err := c.applyRestoreLogic(w)
+	modifiedByRestoreLogic, err := c.applyRestoreLogic(w, caller)
 	if err != nil {
 		return false, err
 	}
 
 	// check if backup is configured for this workload and perform respective operations
-	modifiedByBackupLogic, err := c.applyBackupLogic(w)
+	modifiedByBackupLogic, err := c.applyBackupLogic(w, caller)
 	if err != nil {
 		return false, err
 	}
@@ -44,7 +44,7 @@ func (c *StashController) applyStashLogic(w *wapi.Workload) (bool, error) {
 
 // applyRestoreLogic check if  RestoreSession is configured for this workload
 // and perform operation accordingly
-func (c *StashController) applyRestoreLogic(w *wapi.Workload) (bool, error) {
+func (c *StashController) applyRestoreLogic(w *wapi.Workload, caller string) (bool, error) {
 	// detect old RestoreSession from annotations if it does exist.
 	oldRestore, err := util.GetAppliedRestoreSession(w.Annotations)
 	if err != nil {
@@ -59,7 +59,7 @@ func (c *StashController) applyRestoreLogic(w *wapi.Workload) (bool, error) {
 	// this means RestoreSession has been newly created/updated.
 	// in this case, we have to add/update the init-container accordingly.
 	if newRestore != nil && !util.RestoreSessionEqual(oldRestore, newRestore) {
-		err := c.ensureRestoreInitContainer(w, newRestore)
+		err := c.ensureRestoreInitContainer(w, newRestore, caller)
 		if err != nil {
 			return false, err
 		}
@@ -81,20 +81,23 @@ func (c *StashController) applyRestoreLogic(w *wapi.Workload) (bool, error) {
 
 // applyBackupLogic check if Backup annotations or BackupConfiguration is configured for this workload
 // and perform operation accordingly
-func (c *StashController) applyBackupLogic(w *wapi.Workload) (bool, error) {
-	// check if the workload has backup annotations and perform respective operation accordingly
-	err := c.applyBackupAnnotationLogic(w)
-	if err != nil {
-		return false, err
+func (c *StashController) applyBackupLogic(w *wapi.Workload, caller string) (bool, error) {
+	//Don't create repository, BackupConfiguration stuff when the caller is webhook to make the webhooks side effect free.
+	if caller != util.CallerWebhook {
+		// check if the workload has backup annotations and perform respective operation accordingly
+		err := c.applyBackupAnnotationLogic(w)
+		if err != nil {
+			return false, err
+		}
 	}
 	// check if any BackupConfiguration exist for this workload. if exist then inject sidecar container
-	modified, err := c.applyBackupConfigurationLogic(w)
+	modified, err := c.applyBackupConfigurationLogic(w, caller)
 	if err != nil {
 		return false, err
 	}
 	// if no BackupConfiguration is configured then check if Restic is configured (backward compatibility)
 	if !modified {
-		return c.applyResticLogic(w)
+		return c.applyResticLogic(w, caller)
 	}
 	return modified, nil
 }
@@ -199,24 +202,33 @@ func hasStashInitContainer(containers []core.Container) bool {
 	return false
 }
 
-func (c *StashController) getTotalHosts(target *api_v1beta1.Target, namespace string) (*int32, error) {
+func (c *StashController) getTotalHosts(target interface{}, namespace string) (*int32, error) {
 
 	// for cluster backup/restore, target is nil. in this case, there is only one host
 	if target == nil {
 		return types.Int32P(1), nil
 	}
 
-	switch target.Ref.Kind {
+	var targetRef api_v1beta1.TargetRef
+
+	switch target.(type) {
+	case *api_v1beta1.BackupTarget:
+		targetRef = target.(*api_v1beta1.BackupTarget).Ref
+	case *api_v1beta1.RestoreTarget:
+		targetRef = target.(*api_v1beta1.RestoreTarget).Ref
+	}
+
+	switch targetRef.Kind {
 	// all replicas of StatefulSet will take backup/restore. so total number of hosts will be number of replicas.
 	case apis.KindStatefulSet:
-		ss, err := c.kubeClient.AppsV1().StatefulSets(namespace).Get(target.Ref.Name, metav1.GetOptions{})
+		ss, err := c.kubeClient.AppsV1().StatefulSets(namespace).Get(targetRef.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
 		return ss.Spec.Replicas, nil
 	// all Daemon pod will take backup/restore. so total number of hosts will be number of ready replicas
 	case apis.KindDaemonSet:
-		dmn, err := c.kubeClient.AppsV1().DaemonSets(namespace).Get(target.Ref.Name, metav1.GetOptions{})
+		dmn, err := c.kubeClient.AppsV1().DaemonSets(namespace).Get(targetRef.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}

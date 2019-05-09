@@ -1,5 +1,5 @@
 # Stash
-[Stash by AppsCode](https://github.com/appscode/stash) - Backup your Kubernetes Volumes
+[Stash by AppsCode](https://github.com/stashed/stash) - Backup your Kubernetes Volumes
 ## TL;DR;
 
 ```console
@@ -10,7 +10,7 @@ $ helm install appscode/stash --name stash-operator --namespace kube-system
 
 ## Introduction
 
-This chart bootstraps a [Stash controller](https://github.com/appscode/stash) deployment on a [Kubernetes](http://kubernetes.io) cluster using the [Helm](https://helm.sh) package manager.
+This chart bootstraps a [Stash controller](https://github.com/stashed/stash) deployment on a [Kubernetes](http://kubernetes.io) cluster using the [Helm](https://helm.sh) package manager.
 
 ## Prerequisites
 
@@ -59,7 +59,6 @@ The following table lists the configurable parameters of the Stash chart and the
 | `annotations`                        | Annotations applied to operator pod(s)                                                                                                                                     | `{}`                                                      |
 | `nodeSelector`                       | Node labels for pod assignment                                                                                                                                             | `{}`                                                      |
 | `tolerations`                        | Tolerations used pod assignment                                                                                                                                            | `{}`                                                      |
-| `rbac.create`                        | If `true`, create and use RBAC resources                                                                                                                                   | `true`                                                    |
 | `serviceAccount.create`              | If `true`, create a new service account                                                                                                                                    | `true`                                                    |
 | `serviceAccount.name`                | Service account to be used. If not set and `serviceAccount.create` is `true`, a name is generated using the fullname template                                              | ``                                                        |
 | `apiserver.groupPriorityMinimum`     | The minimum priority the group should have.                                                                                                                                | 10000                                                     |
@@ -91,23 +90,4 @@ installing the chart. For example:
 $ helm install --name stash-operator --values values.yaml appscode/stash
 ```
 
-## RBAC
-By default the chart will not install the recommended RBAC roles and rolebindings.
 
-You need to have the flag `--authorization-mode=RBAC` on the api server. See the following document for how to enable [RBAC](https://kubernetes.io/docs/admin/authorization/rbac/).
-
-To determine if your cluster supports RBAC, run the following command:
-
-```console
-$ kubectl api-versions | grep rbac
-```
-
-If the output contains "beta", you may install the chart with RBAC enabled (see below).
-
-### Enable RBAC role/rolebinding creation
-
-To enable the creation of RBAC resources (On clusters with RBAC). Do the following:
-
-```console
-$ helm install --name stash-operator appscode/stash --set rbac.create=true
-```

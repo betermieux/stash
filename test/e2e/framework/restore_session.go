@@ -4,11 +4,11 @@ import (
 	"time"
 
 	"github.com/appscode/go/crypto/rand"
-	"github.com/appscode/stash/apis"
-	"github.com/appscode/stash/apis/stash/v1beta1"
 	. "github.com/onsi/gomega"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"stash.appscode.dev/stash/apis"
+	"stash.appscode.dev/stash/apis/stash/v1beta1"
 )
 
 func (f *Invocation) RestoreSession(repoName string, targetref v1beta1.TargetRef, rules []v1beta1.Rule) v1beta1.RestoreSession {
@@ -22,7 +22,7 @@ func (f *Invocation) RestoreSession(repoName string, targetref v1beta1.TargetRef
 				Name: repoName,
 			},
 			Rules: rules,
-			Target: &v1beta1.Target{
+			Target: &v1beta1.RestoreTarget{
 				Ref: targetref,
 				VolumeMounts: []core.VolumeMount{
 					{
@@ -51,13 +51,13 @@ func (f *Framework) EventuallyRestoreSessionPhase(meta metav1.ObjectMeta) Gomega
 		Expect(err).NotTo(HaveOccurred())
 		return restoreSession.Status.Phase
 	},
-		time.Minute*5,
-		time.Second*5,
+		time.Minute*7,
+		time.Second*7,
 	)
 }
 
-func (f *Invocation) PvcRestoreTarget(pvcName string) *v1beta1.Target {
-	return &v1beta1.Target{
+func (f *Invocation) PvcRestoreTarget(pvcName string) *v1beta1.RestoreTarget {
+	return &v1beta1.RestoreTarget{
 		Ref: v1beta1.TargetRef{
 			APIVersion: "v1",
 			Kind:       apis.KindPersistentVolumeClaim,

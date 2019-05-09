@@ -3,7 +3,7 @@ package restic
 import (
 	"time"
 
-	api_v1beta1 "github.com/appscode/stash/apis/stash/v1beta1"
+	api_v1beta1 "stash.appscode.dev/stash/apis/stash/v1beta1"
 )
 
 func (w *ResticWrapper) RunRestore(restoreOptions RestoreOptions) (*RestoreOutput, error) {
@@ -25,7 +25,7 @@ func (w *ResticWrapper) RunRestore(restoreOptions RestoreOptions) (*RestoreOutpu
 		}
 	} else if len(restoreOptions.RestoreDirs) != 0 {
 		for _, path := range restoreOptions.RestoreDirs {
-			if _, err := w.restore(path, restoreOptions.Host, "", restoreOptions.Destination); err != nil {
+			if _, err := w.restore(path, restoreOptions.SourceHost, "", restoreOptions.Destination); err != nil {
 				return nil, err
 			}
 		}

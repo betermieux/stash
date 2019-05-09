@@ -4,13 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/appscode/stash/apis"
-	api_v1alpha1 "github.com/appscode/stash/apis/stash/v1alpha1"
-	api_v1beta1 "github.com/appscode/stash/apis/stash/v1beta1"
-	v1alpha1_util "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1alpha1/util"
-	v1beta1_util "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1beta1/util"
-	"github.com/appscode/stash/pkg/resolve"
-	"github.com/appscode/stash/pkg/util"
 	core "k8s.io/api/core/v1"
 	kerr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,6 +12,13 @@ import (
 	core_util "kmodules.xyz/client-go/core/v1"
 	meta_util "kmodules.xyz/client-go/meta"
 	wapi "kmodules.xyz/webhook-runtime/apis/workload/v1"
+	"stash.appscode.dev/stash/apis"
+	api_v1alpha1 "stash.appscode.dev/stash/apis/stash/v1alpha1"
+	api_v1beta1 "stash.appscode.dev/stash/apis/stash/v1beta1"
+	v1alpha1_util "stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1alpha1/util"
+	v1beta1_util "stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1beta1/util"
+	"stash.appscode.dev/stash/pkg/resolve"
+	"stash.appscode.dev/stash/pkg/util"
 )
 
 // applyBackupAnnotationLogic check if the workload has backup annotations then ensure respective Repository and BackupConfiguration.
@@ -104,7 +104,7 @@ func (c *StashController) applyBackupAnnotationLogic(w *wapi.Workload) error {
 	return nil
 }
 
-func (c *StashController) applyBackupConfigurationLogic(w *wapi.Workload) (bool, error) {
+func (c *StashController) applyBackupConfigurationLogic(w *wapi.Workload, caller string) (bool, error) {
 	// detect old BackupConfiguration from annotations if it does exist.
 	oldbc, err := util.GetAppliedBackupConfiguration(w.Annotations)
 	if err != nil {
@@ -119,7 +119,7 @@ func (c *StashController) applyBackupConfigurationLogic(w *wapi.Workload) (bool,
 	// this means BackupConfiguration has been newly created/updated.
 	// in this case, we have to add/update sidecar container accordingly.
 	if newbc != nil && !util.BackupConfigurationEqual(oldbc, newbc) {
-		err := c.ensureBackupSidecar(w, newbc)
+		err := c.ensureBackupSidecar(w, newbc, caller)
 		if err != nil {
 			return false, err
 		}
@@ -139,7 +139,7 @@ func (c *StashController) applyBackupConfigurationLogic(w *wapi.Workload) (bool,
 	return false, nil
 }
 
-func (c *StashController) applyResticLogic(w *wapi.Workload) (bool, error) {
+func (c *StashController) applyResticLogic(w *wapi.Workload, caller string) (bool, error) {
 	// detect old Restic from annotations if it does exist
 	oldRestic, err := util.GetAppliedRestic(w.Annotations)
 	if err != nil {
@@ -156,7 +156,7 @@ func (c *StashController) applyResticLogic(w *wapi.Workload) (bool, error) {
 	// this means Restic has been newly created/updated.
 	// in this case, we have to add/update the sidecar container accordingly.
 	if newRestic != nil && !util.ResticEqual(oldRestic, newRestic) {
-		err := c.ensureWorkloadSidecar(w, newRestic)
+		err := c.ensureWorkloadSidecar(w, newRestic, caller)
 		if err != nil {
 			return false, err
 		}
@@ -197,7 +197,7 @@ func (c *StashController) ensureBackupConfiguration(backupTemplate *api_v1beta1.
 		// set workload as owner of this backupConfiguration object
 		core_util.EnsureOwnerReference(&in.ObjectMeta, target)
 		in.Spec.Repository.Name = getRepositoryName(target)
-		in.Spec.Target = &api_v1beta1.Target{
+		in.Spec.Target = &api_v1beta1.BackupTarget{
 			Ref: api_v1beta1.TargetRef{
 				APIVersion: target.APIVersion,
 				Kind:       target.Kind,

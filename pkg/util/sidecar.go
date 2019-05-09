@@ -4,18 +4,18 @@ import (
 	"fmt"
 
 	"github.com/appscode/go/types"
-	"github.com/appscode/stash/apis"
-	api "github.com/appscode/stash/apis/stash/v1alpha1"
-	v1beta1_api "github.com/appscode/stash/apis/stash/v1beta1"
-	"github.com/appscode/stash/pkg/docker"
 	core "k8s.io/api/core/v1"
 	"kmodules.xyz/client-go/tools/analytics"
 	"kmodules.xyz/client-go/tools/cli"
 	"kmodules.xyz/client-go/tools/clientcmd"
 	store "kmodules.xyz/objectstore-api/api/v1"
+	"stash.appscode.dev/stash/apis"
+	api "stash.appscode.dev/stash/apis/stash/v1alpha1"
+	v1beta1_api "stash.appscode.dev/stash/apis/stash/v1beta1"
+	"stash.appscode.dev/stash/pkg/docker"
 )
 
-func NewSidecarContainer(r *api.Restic, workload api.LocalTypedReference, image docker.Docker, enableRBAC bool) core.Container {
+func NewSidecarContainer(r *api.Restic, workload api.LocalTypedReference, image docker.Docker) core.Container {
 	if r.Annotations != nil {
 		if v, ok := r.Annotations[apis.VersionTag]; ok {
 			image.Tag = v
@@ -36,7 +36,6 @@ func NewSidecarContainer(r *api.Restic, workload api.LocalTypedReference, image 
 			fmt.Sprintf("--enable-status-subresource=%v", apis.EnableStatusSubresource),
 			fmt.Sprintf("--use-kubeapiserver-fqdn-for-aks=%v", clientcmd.UseKubeAPIServerFQDNForAKS()),
 			fmt.Sprintf("--enable-analytics=%v", cli.EnableAnalytics),
-			fmt.Sprintf("--enable-rbac=%v", enableRBAC),
 		}, cli.LoggerOptions.ToFlags()...),
 		Env: []core.EnvVar{
 			{
@@ -90,7 +89,7 @@ func NewSidecarContainer(r *api.Restic, workload api.LocalTypedReference, image 
 	return sidecar
 }
 
-func NewBackupSidecarContainer(bc *v1beta1_api.BackupConfiguration, backend *store.Backend, image docker.Docker, enableRBAC bool) core.Container {
+func NewBackupSidecarContainer(bc *v1beta1_api.BackupConfiguration, backend *store.Backend, image docker.Docker) core.Container {
 	sidecar := core.Container{
 		Name:  StashContainer,
 		Image: image.ToContainerImage(),
@@ -105,7 +104,6 @@ func NewBackupSidecarContainer(bc *v1beta1_api.BackupConfiguration, backend *sto
 			fmt.Sprintf("--enable-status-subresource=%v", apis.EnableStatusSubresource),
 			fmt.Sprintf("--use-kubeapiserver-fqdn-for-aks=%v", clientcmd.UseKubeAPIServerFQDNForAKS()),
 			fmt.Sprintf("--enable-analytics=%v", cli.EnableAnalytics),
-			fmt.Sprintf("--enable-rbac=%v", enableRBAC),
 		}, cli.LoggerOptions.ToFlags()...),
 		Env: []core.EnvVar{
 			{

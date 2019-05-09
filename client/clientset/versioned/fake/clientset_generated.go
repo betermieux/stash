@@ -19,18 +19,18 @@ limitations under the License.
 package fake
 
 import (
-	clientset "github.com/appscode/stash/client/clientset/versioned"
-	repositoriesv1alpha1 "github.com/appscode/stash/client/clientset/versioned/typed/repositories/v1alpha1"
-	fakerepositoriesv1alpha1 "github.com/appscode/stash/client/clientset/versioned/typed/repositories/v1alpha1/fake"
-	stashv1alpha1 "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1alpha1"
-	fakestashv1alpha1 "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1alpha1/fake"
-	stashv1beta1 "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1beta1"
-	fakestashv1beta1 "github.com/appscode/stash/client/clientset/versioned/typed/stash/v1beta1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
+	clientset "stash.appscode.dev/stash/client/clientset/versioned"
+	repositoriesv1alpha1 "stash.appscode.dev/stash/client/clientset/versioned/typed/repositories/v1alpha1"
+	fakerepositoriesv1alpha1 "stash.appscode.dev/stash/client/clientset/versioned/typed/repositories/v1alpha1/fake"
+	stashv1alpha1 "stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1alpha1"
+	fakestashv1alpha1 "stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1alpha1/fake"
+	stashv1beta1 "stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1beta1"
+	fakestashv1beta1 "stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1beta1/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -80,11 +80,6 @@ func (c *Clientset) RepositoriesV1alpha1() repositoriesv1alpha1.RepositoriesV1al
 	return &fakerepositoriesv1alpha1.FakeRepositoriesV1alpha1{Fake: &c.Fake}
 }
 
-// Repositories retrieves the RepositoriesV1alpha1Client
-func (c *Clientset) Repositories() repositoriesv1alpha1.RepositoriesV1alpha1Interface {
-	return &fakerepositoriesv1alpha1.FakeRepositoriesV1alpha1{Fake: &c.Fake}
-}
-
 // StashV1alpha1 retrieves the StashV1alpha1Client
 func (c *Clientset) StashV1alpha1() stashv1alpha1.StashV1alpha1Interface {
 	return &fakestashv1alpha1.FakeStashV1alpha1{Fake: &c.Fake}
@@ -92,10 +87,5 @@ func (c *Clientset) StashV1alpha1() stashv1alpha1.StashV1alpha1Interface {
 
 // StashV1beta1 retrieves the StashV1beta1Client
 func (c *Clientset) StashV1beta1() stashv1beta1.StashV1beta1Interface {
-	return &fakestashv1beta1.FakeStashV1beta1{Fake: &c.Fake}
-}
-
-// Stash retrieves the StashV1beta1Client
-func (c *Clientset) Stash() stashv1beta1.StashV1beta1Interface {
 	return &fakestashv1beta1.FakeStashV1beta1{Fake: &c.Fake}
 }

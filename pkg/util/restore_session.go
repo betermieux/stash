@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"reflect"
 
-	v1beta1_api "github.com/appscode/stash/apis/stash/v1beta1"
-	v1beta1_listers "github.com/appscode/stash/client/listers/stash/v1beta1"
 	kerr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"kmodules.xyz/client-go/meta"
 	wapi "kmodules.xyz/webhook-runtime/apis/workload/v1"
+	v1beta1_api "stash.appscode.dev/stash/apis/stash/v1beta1"
+	v1beta1_listers "stash.appscode.dev/stash/client/listers/stash/v1beta1"
 )
 
 // GetAppliedRestoreSession check weather RestoreSession was applied as annotation and returns the object definition if exist.
@@ -44,7 +44,7 @@ func FindRestoreSession(lister v1beta1_listers.RestoreSessionLister, w *wapi.Wor
 	result := make([]*v1beta1_api.RestoreSession, 0)
 	// keep only those RestoreSession that has this workload as target
 	for _, restoreSession := range restoreSessions {
-		if restoreSession.DeletionTimestamp == nil && IsTarget(restoreSession.Spec.Target, w) {
+		if restoreSession.DeletionTimestamp == nil && IsRestoreTarget(restoreSession.Spec.Target, w) {
 			result = append(result, restoreSession)
 		}
 	}
